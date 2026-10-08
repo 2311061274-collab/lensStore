@@ -1,0 +1,89 @@
+@extends('layouts.admin')
+
+@section('title', 'Thêm Voucher Mới')
+
+@section('content')
+<div class="page-header d-flex justify-content-between align-items-center">
+    <h2><i class="fa-solid fa-plus text-primary"></i> Thêm Voucher Mới</h2>
+    <a href="{{ route('admin.vouchers.index') }}" class="btn btn-secondary">
+        <i class="fa-solid fa-arrow-left"></i> Quay lại
+    </a>
+</div>
+
+<div class="card mt-4">
+    <form action="{{ route('admin.vouchers.store') }}" method="POST">
+        @csrf
+
+        <div class="grid grid-cols-2 gap-4">
+            <div class="form-group">
+                <label>Mã Voucher <span class="text-danger">*</span></label>
+                <input type="text" name="code" class="form-control" value="{{ old('code') }}" required style="text-transform: uppercase;">
+                <small class="text-muted">Viết liền không dấu, ví dụ: SUMMER2026</small>
+            </div>
+
+            <div class="form-group">
+                <label>Loại giảm giá <span class="text-danger">*</span></label>
+                <select name="discount_type" class="form-control" id="discount_type" required>
+                    <option value="fixed" {{ old('discount_type') == 'fixed' ? 'selected' : '' }}>Giảm thẳng (VNĐ)</option>
+                    <option value="percent" {{ old('discount_type') == 'percent' ? 'selected' : '' }}>Giảm theo phần trăm (%)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Giá trị giảm <span class="text-danger">*</span></label>
+                <input type="number" name="discount_value" class="form-control" value="{{ old('discount_value') }}" required min="0" step="0.01">
+            </div>
+
+            <div class="form-group" id="max_discount_wrapper" style="display: {{ old('discount_type') == 'percent' ? 'block' : 'none' }}">
+                <label>Mức giảm tối đa (VNĐ)</label>
+                <input type="number" name="max_discount_value" class="form-control" value="{{ old('max_discount_value') }}" min="0">
+                <small class="text-muted">Chỉ áp dụng khi giảm theo % (Để trống nếu không giới hạn)</small>
+            </div>
+
+            <div class="form-group">
+                <label>Giá trị đơn tối thiểu (VNĐ)</label>
+                <input type="number" name="min_order_value" class="form-control" value="{{ old('min_order_value', 0) }}" min="0">
+            </div>
+
+            <div class="form-group">
+                <label>Giới hạn lượt dùng</label>
+                <input type="number" name="usage_limit" class="form-control" value="{{ old('usage_limit') }}" min="1">
+                <small class="text-muted">Để trống nếu không giới hạn</small>
+            </div>
+
+            <div class="form-group">
+                <label>Thời gian bắt đầu</label>
+                <input type="datetime-local" name="starts_at" class="form-control" value="{{ old('starts_at') }}">
+            </div>
+
+            <div class="form-group">
+                <label>Thời gian kết thúc</label>
+                <input type="datetime-local" name="expires_at" class="form-control" value="{{ old('expires_at') }}">
+            </div>
+            
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label style="display:flex; align-items:center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="is_active" value="1" {{ old('is_active', true) ? 'checked' : '' }} style="width: 18px; height: 18px;">
+                    <strong>Kích hoạt Voucher</strong>
+                </label>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-floppy-disk"></i> Lưu Voucher
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.getElementById('discount_type').addEventListener('change', function() {
+        if(this.value === 'percent') {
+            document.getElementById('max_discount_wrapper').style.display = 'block';
+        } else {
+            document.getElementById('max_discount_wrapper').style.display = 'none';
+        }
+    });
+</script>
+@endsection
