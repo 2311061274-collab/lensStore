@@ -53,6 +53,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/wishlist/toggle', [\App\Http\Controllers\WishlistController::class, 'toggle'])->name('wishlist.toggle');
 
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+    Route::post('/cart/buy-now', [CartController::class, 'buyNow'])->name('cart.buy-now');
     Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
     Route::put('/cart/update/{cart}', [CartController::class, 'update'])->name('cart.update');
     Route::post('/cart/update-selection', [CartController::class, 'updateSelection'])->name('cart.update-selection');
@@ -154,6 +155,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
         Route::get('customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers.index');
         Route::get('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'show'])->name('customers.show');
         Route::post('customers/{customer}/notes', [\App\Http\Controllers\Admin\CustomerController::class, 'storeNote'])->name('customers.notes.store');
+        Route::patch('customers/{customer}/toggle-lock', [\App\Http\Controllers\Admin\CustomerController::class, 'toggleLock'])->name('customers.toggleLock');
+        Route::delete('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'destroy'])->name('customers.destroy');
     });
 
     Route::middleware(['permission:manage_orders'])->group(function () {

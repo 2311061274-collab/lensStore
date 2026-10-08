@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Đơn #' . $order->id)
+@section('title', 'Đơn #' . ($order->order_code ?? $order->id))
 @section('subtitle', $order->status_label . ' · ' . $order->created_at->format('d/m/Y H:i'))
 
 @section('actions')

@@ -52,6 +52,42 @@ class CartController extends Controller
         return redirect()->back()->with('success', 'Đã thêm sản phẩm vào giỏ hàng.');
     }
 
+    public function buyNow(Request $request)
+    {
+        $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|integer|min:1'
+        ]);
+
+        Cart::where('user_id', Auth::id())->update(['is_selected' => false]);
+
+        $cart = Cart::where('user_id', Auth::id())->where('product_id', $request->product_id)->first();
+
+        if ($cart) {
+            $cart->update([
+                'quantity' => $cart->quantity + $request->quantity,
+                'is_selected' => true,
+                'updated_at' => now(),
+            ]);
+        } else {
+            Cart::create([
+                'user_id' => Auth::id(),
+                'product_id' => $request->product_id,
+                'quantity' => $request->quantity,
+                'is_selected' => true,
+            ]);
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'redirect' => route('checkout.index')
+            ]);
+        }
+
+        return redirect()->route('checkout.index');
+    }
+
     public function update(Request $request, Cart $cart)
     {
         if ($cart->user_id !== Auth::id()) {

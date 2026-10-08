@@ -25,7 +25,7 @@
 <div class="review-container">
     <div class="card">
         <h2 class="card-title">Đánh giá Sản phẩm</h2>
-        <p style="color:#64748b; margin-bottom: 1.5rem;">Đơn hàng <strong>#{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</strong></p>
+        <p style="color:#64748b; margin-bottom: 1.5rem;">Đơn hàng <strong>#{{ $order->order_code ?? str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</strong></p>
 
         <form action="{{ route('orders.review.store', $order->id) }}" method="POST">
             @csrf

@@ -45,7 +45,7 @@
     </a>
 
     <h1 class="detail-title">
-        Chi tiết đơn hàng #{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}
+        Chi tiết đơn hàng #{{ $order->order_code ?? str_pad($order->id, 6, '0', STR_PAD_LEFT) }}
     </h1>
 
     @if(session('success'))
