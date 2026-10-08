@@ -1,0 +1,8 @@
+.git
+.env
+/vendor
+/node_modules
+/public/build
+/storage/logs/*
+!/storage/logs/.gitignore
+docker/render.env.example
