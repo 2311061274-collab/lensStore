@@ -1,0 +1,106 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, gd
+          coverage: none
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Copy .env Configuration
+        run: |
+          cp .env.example .env
+
+      - name: Configure Database from GitHub Secrets
+        env:
+          SECRET_DB_URL: ${{ secrets.DB_URL }}
+          SECRET_DB_HOST: ${{ secrets.DB_HOST }}
+          SECRET_DB_PORT: ${{ secrets.DB_PORT }}
+          SECRET_DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          SECRET_DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          SECRET_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          if [ -n "$SECRET_DB_URL" ]; then
+            echo "DB_CONNECTION=mysql" >> .env
+            echo "DB_URL=$SECRET_DB_URL" >> .env
+            echo "MYSQL_ATTR_SSL_CA=ca.pem" >> .env
+          elif [ -n "$SECRET_DB_HOST" ]; then
+            echo "DB_CONNECTION=mysql" >> .env
+            echo "DB_HOST=$SECRET_DB_HOST" >> .env
+            echo "DB_PORT=${SECRET_DB_PORT:-27914}" >> .env
+            echo "DB_DATABASE=${SECRET_DB_DATABASE:-defaultdb}" >> .env
+            echo "DB_USERNAME=${SECRET_DB_USERNAME:-avnadmin}" >> .env
+            echo "DB_PASSWORD=$SECRET_DB_PASSWORD" >> .env
+            echo "MYSQL_ATTR_SSL_CA=ca.pem" >> .env
+          else
+            echo "No DB secrets provided, falling back to local SQLite"
+            touch database/database.sqlite
+            echo "DB_CONNECTION=sqlite" >> .env
+            echo "DB_DATABASE=database/database.sqlite" >> .env
+          fi
+
+      - name: Install PHP Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
+      - name: Install NPM Dependencies & Build Assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Run Database Migrations
+        run: php artisan migrate --force
+
+      - name: Export Static Site for GitHub Pages
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          # Nếu là trang user/organization (vd username.github.io) thì base-path để trống, ngược lại dùng /tên-repo
+          if [[ "${{ github.repository }}" == *".github.io" ]]; then
+            php artisan app:export-static --base-path=""
+          else
+            php artisan app:export-static --base-path="/${REPO_NAME}"
+          fi
+
+      - name: Upload GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

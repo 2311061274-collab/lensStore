@@ -60,7 +60,9 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                (defined('Pdo\Mysql::ATTR_SSL_CA') ? Mysql::ATTR_SSL_CA : \PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA')
+                    ? (file_exists(base_path(env('MYSQL_ATTR_SSL_CA'))) ? base_path(env('MYSQL_ATTR_SSL_CA')) : env('MYSQL_ATTR_SSL_CA'))
+                    : (file_exists(base_path('ca.pem')) && !in_array(env('DB_HOST'), ['127.0.0.1', 'localhost', '']) ? base_path('ca.pem') : null),
             ]) : [],
         ],
 
