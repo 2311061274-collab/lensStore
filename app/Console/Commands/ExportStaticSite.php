@@ -701,25 +701,49 @@ class ExportStaticSite extends Command
                     </div>
                     <a href="\${BASE_URL}/orders/" style="text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;font-size:0.9rem;"><i class="fa-solid fa-clipboard-list"></i> Đơn hàng</a>
                     <div class="sf-acc-dropdown" style="position:relative;display:inline-block;">
-                        <a class="sf-acc-trigger" style="cursor:pointer;text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;">
+                        <a class="sf-acc-trigger" style="cursor:pointer;text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;user-select:none;">
                             <span style="width:30px;height:30px;background:var(--primary,#4f46e5);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.8rem;">\${initial}</span>
                             <span>\${name}</span>
                             <i class="fa-solid fa-chevron-down" style="font-size:0.7rem;"></i>
                         </a>
-                        <div class="sf-acc-menu" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:white;min-width:200px;box-shadow:0 20px 40px rgba(0,0,0,0.12);border-radius:16px;z-index:100;border:1px solid var(--border,#e2e8f0);overflow:hidden;padding:8px 0;">
-                            <a href="\${BASE_URL}/profile/" style="color:var(--text-main,#1e293b);display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;font-size:0.9rem;"><i class="fa-solid fa-user" style="width:16px;color:var(--primary,#4f46e5);"></i> Hồ sơ cá nhân</a>
-                            <a href="\${BASE_URL}/orders/" style="color:var(--text-main,#1e293b);display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;font-size:0.9rem;"><i class="fa-solid fa-box" style="width:16px;color:var(--primary,#4f46e5);"></i> Đơn hàng của tôi</a>
+                        <div class="sf-acc-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:white;min-width:210px;box-shadow:0 20px 40px rgba(0,0,0,0.14);border-radius:14px;z-index:1000;border:1px solid var(--border,#e2e8f0);padding:8px 0;">
+                            <a href="\${BASE_URL}/profile/" style="color:var(--text-main,#1e293b);display:flex;align-items:center;gap:10px;padding:10px 18px;text-decoration:none;font-size:0.9rem;"><i class="fa-solid fa-user" style="width:16px;color:var(--primary,#4f46e5);"></i> Hồ sơ cá nhân</a>
+                            <a href="\${BASE_URL}/orders/" style="color:var(--text-main,#1e293b);display:flex;align-items:center;gap:10px;padding:10px 18px;text-decoration:none;font-size:0.9rem;"><i class="fa-solid fa-box" style="width:16px;color:var(--primary,#4f46e5);"></i> Đơn hàng của tôi</a>
                             <div style="height:1px;background:var(--border,#e2e8f0);margin:4px 0;"></div>
-                            <a href="#" class="ls-logout-btn" style="color:#ef4444;display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;font-size:0.9rem;font-weight:500;cursor:pointer;"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i> Đăng xuất</a>
+                            <a href="#" class="ls-logout-btn" style="color:#ef4444;display:flex;align-items:center;gap:10px;padding:10px 18px;text-decoration:none;font-size:0.9rem;font-weight:600;cursor:pointer;"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i> Đăng xuất</a>
                         </div>
                     </div>
                 `;
 
                 const accDropdown = authContainer.querySelector('.sf-acc-dropdown');
                 const accMenu = authContainer.querySelector('.sf-acc-menu');
+                const accTrigger = authContainer.querySelector('.sf-acc-trigger');
                 if (accDropdown && accMenu) {
-                    accDropdown.addEventListener('mouseenter', () => accMenu.style.display = 'block');
-                    accDropdown.addEventListener('mouseleave', () => accMenu.style.display = 'none');
+                    let closeTimer = null;
+                    accDropdown.addEventListener('mouseenter', () => {
+                        if (closeTimer) clearTimeout(closeTimer);
+                        accMenu.style.display = 'block';
+                    });
+                    accDropdown.addEventListener('mouseleave', () => {
+                        closeTimer = setTimeout(() => {
+                            if (!accDropdown.classList.contains('is-open')) {
+                                accMenu.style.display = 'none';
+                            }
+                        }, 250);
+                    });
+                    if (accTrigger) {
+                        accTrigger.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            accDropdown.classList.toggle('is-open');
+                            accMenu.style.display = accDropdown.classList.contains('is-open') ? 'block' : 'none';
+                        });
+                    }
+                    document.addEventListener('click', (e) => {
+                        if (!e.target.closest('.sf-acc-dropdown')) {
+                            accDropdown.classList.remove('is-open');
+                            accMenu.style.display = 'none';
+                        }
+                    });
                 }
 
                 const logoutBtn = authContainer.querySelector('.ls-logout-btn');

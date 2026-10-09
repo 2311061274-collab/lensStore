@@ -45,7 +45,7 @@ class ReportController extends Controller
                 break;
         }
 
-        $validStatuses = ['finished'];
+        $validStatuses = ['finished', 'completed'];
 
         // 1. KPI Cards
         $totalRevenue = Order::whereBetween('created_at', [$startDate, $endDate])
@@ -224,6 +224,8 @@ class ReportController extends Controller
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
             fputcsv($out, ['Ngày', 'Số đơn', 'Doanh thu', 'Giảm giá', 'Phí ship']);
+
+            $validStatuses = ['finished', 'completed'];
 
             $rows = Order::select(
                     DB::raw('DATE(created_at) as day'),

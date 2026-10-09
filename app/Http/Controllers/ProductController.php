@@ -121,7 +121,7 @@ class ProductController extends Controller
             $file->move($destinationPath, $fileName);
             $imagePath = 'uploads/products/' . $fileName;
         } elseif ($request->filled('image_url')) {
-            $imagePath = $request->input('image_url');
+            $imagePath = trim($request->input('image_url'));
         }
 
         $productData = [
@@ -218,7 +218,10 @@ class ProductController extends Controller
             $file->move($destinationPath, $fileName);
             $imagePath = 'uploads/products/' . $fileName;
         } elseif ($request->filled('image_url')) {
-            $imagePath = $request->input('image_url');
+            if ($product->image && !str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
+                File::delete(public_path($product->image));
+            }
+            $imagePath = trim($request->input('image_url'));
         }
 
         $productData = [

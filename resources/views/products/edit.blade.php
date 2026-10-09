@@ -266,9 +266,9 @@
                             @php $gallery = is_array($product->gallery_images) ? $product->gallery_images : []; @endphp
                             @foreach($gallery as $i => $g)
                             <div class="gallery-row" style="display:flex; gap:10px; margin-bottom:10px; align-items:center;">
-                                <img src="{{ $g['url'] ?? '' }}" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
-                                <input type="text" name="gallery_urls[]" value="{{ $g['url'] ?? '' }}" placeholder="Hoặc dán URL ảnh..." style="flex:1.5;">
-                                <input type="file" name="gallery_files[]" accept="image/*" style="flex:1;">
+                                <img src="{{ str_starts_with($g['url'] ?? '', 'http') ? ($g['url'] ?? '') : asset($g['url'] ?? '') }}" style="width:50px; height:50px; object-fit:cover; border-radius:4px; {{ empty($g['url']) ? 'display:none;' : '' }}" onerror="this.style.display='none'">
+                                <input type="text" name="gallery_urls[]" value="{{ $g['url'] ?? '' }}" placeholder="Hoặc dán URL ảnh..." style="flex:1.5;" oninput="updateRowThumb(this)">
+                                <input type="file" name="gallery_files[]" accept="image/*" style="flex:1;" onchange="updateFileThumb(this)">
                                 <input type="text" name="gallery_caps[]" value="{{ $g['cap'] ?? '' }}" placeholder="Caption (Nhãn)" style="flex:1.5;">
                                 <button type="button" onclick="this.parentElement.remove()" class="btn btn-secondary" style="padding: 5px 10px;"><i class="fa-solid fa-trash"></i></button>
                             </div>
@@ -284,9 +284,9 @@
                             @php $samples = is_array($product->sample_images) ? $product->sample_images : []; @endphp
                             @foreach($samples as $i => $s)
                             <div class="sample-row" style="display:flex; gap:10px; margin-bottom:10px; align-items:center;">
-                                <img src="{{ $s['url'] ?? '' }}" style="width:50px; height:50px; object-fit:cover; border-radius:4px;">
-                                <input type="text" name="sample_urls[]" value="{{ $s['url'] ?? '' }}" placeholder="Hoặc dán URL ảnh..." style="flex:1.5;">
-                                <input type="file" name="sample_files[]" accept="image/*" style="flex:1;">
+                                <img src="{{ str_starts_with($s['url'] ?? '', 'http') ? ($s['url'] ?? '') : asset($s['url'] ?? '') }}" style="width:50px; height:50px; object-fit:cover; border-radius:4px; {{ empty($s['url']) ? 'display:none;' : '' }}" onerror="this.style.display='none'">
+                                <input type="text" name="sample_urls[]" value="{{ $s['url'] ?? '' }}" placeholder="Hoặc dán URL ảnh..." style="flex:1.5;" oninput="updateRowThumb(this)">
+                                <input type="file" name="sample_files[]" accept="image/*" style="flex:1;" onchange="updateFileThumb(this)">
                                 <input type="text" name="sample_tags[]" value="{{ $s['tag'] ?? '' }}" placeholder="Thẻ (VD: Chân dung)" style="flex:1;">
                                 <input type="text" name="sample_texts[]" value="{{ $s['text'] ?? '' }}" placeholder="Mô tả ảnh" style="flex:1.5;">
                                 <button type="button" onclick="this.parentElement.remove()" class="btn btn-secondary" style="padding: 5px 10px;"><i class="fa-solid fa-trash"></i></button>
@@ -365,13 +365,22 @@
                         <img src="{{ $product->image_url }}" alt="{{ $product->name }}" id="imgPreview">
                         <div class="img-overlay">
                             <i class="fa-solid fa-cloud-arrow-up"></i>
-                            <span>Nhấn để chọn ảnh mới</span>
+                            <span>Nhấn để chọn ảnh mới từ máy tính</span>
                         </div>
+                    </div>
+                    <div id="imgSourceBadge" style="font-size:0.78rem; text-align:center; margin-top:6px; font-weight:600; color:var(--muted);">
+                        @if(str_starts_with($product->image ?? '', 'http'))
+                            <span style="color:var(--primary);"><i class="fa-solid fa-link"></i> Đang dùng link URL</span>
+                        @elseif(!empty($product->image))
+                            <span style="color:var(--ok);"><i class="fa-solid fa-image"></i> Đang dùng ảnh tải lên</span>
+                        @else
+                            <span><i class="fa-solid fa-camera"></i> Ảnh mặc định</span>
+                        @endif
                     </div>
                     <input type="file" id="image_file" name="image_file" accept="image/*" style="display:none" onchange="previewImg(this)">
                     <div class="img-or">hoặc dán URL</div>
                     <div class="field">
-                        <input type="url" name="image_url" id="image_url_input" value="{{ old('image_url', str_starts_with($product->image ?? '', 'http') ? $product->image : '') }}" placeholder="https://..." oninput="previewFromUrl(this.value)">
+                        <input type="url" name="image_url" id="image_url_input" value="{{ old('image_url', str_starts_with($product->image ?? '', 'http') ? $product->image : '') }}" placeholder="https://..." oninput="previewFromUrl(this.value)" onchange="previewFromUrl(this.value)">
                         @error('image_url')<div class="error-text">{{ $message }}</div>@enderror
                     </div>
                     @error('image_file')<div class="error-text">{{ $message }}</div>@enderror
@@ -385,17 +394,61 @@
 <script>
 function previewImg(input) {
     if (input.files && input.files[0]) {
+        const file = input.files[0];
         const reader = new FileReader();
-        reader.onload = e => { document.getElementById('imgPreview').src = e.target.result; };
-        reader.readAsDataURL(input.files[0]);
+        reader.onload = e => { 
+            document.getElementById('imgPreview').src = e.target.result; 
+            const badge = document.getElementById('imgSourceBadge');
+            if (badge) badge.innerHTML = `<span style="color:var(--ok);"><i class="fa-solid fa-circle-check"></i> Đã chọn file từ máy: ${file.name}</span>`;
+        };
+        reader.readAsDataURL(file);
         document.getElementById('image_url_input').value = '';
     }
 }
+
 function previewFromUrl(url) {
-    if (url.startsWith('http')) {
-        document.getElementById('imgPreview').src = url;
+    url = (url || '').trim();
+    const preview = document.getElementById('imgPreview');
+    const badge = document.getElementById('imgSourceBadge');
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        preview.src = url;
+        preview.onerror = function() {
+            preview.src = "{{ $product->image_url }}";
+            if (badge) badge.innerHTML = `<span style="color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Không tải được ảnh từ URL này</span>`;
+        };
+        preview.onload = function() {
+            if (badge) badge.innerHTML = `<span style="color:var(--primary);"><i class="fa-solid fa-link"></i> Đang hiển thị từ URL</span>`;
+        };
         document.getElementById('image_file').value = '';
+    } else if (url === '') {
+        preview.src = "{{ $product->image_url }}";
+        if (badge) badge.innerHTML = '@if(str_starts_with($product->image ?? '', 'http'))<span style="color:var(--primary);"><i class="fa-solid fa-link"></i> Đang dùng link URL</span>@elseif(!empty($product->image))<span style="color:var(--ok);"><i class="fa-solid fa-image"></i> Đang dùng ảnh tải lên</span>@else<span><i class="fa-solid fa-camera"></i> Ảnh mặc định</span>@endif';
     }
+}
+
+function updateRowThumb(input) {
+    const row = input.closest('.gallery-row, .sample-row');
+    const img = row ? row.querySelector('img') : null;
+    if (!img) return;
+    const url = input.value.trim();
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        img.src = url;
+        img.style.display = 'block';
+    } else if (!url) {
+        img.style.display = 'none';
+    }
+}
+
+function updateFileThumb(input) {
+    const row = input.closest('.gallery-row, .sample-row');
+    const img = row ? row.querySelector('img') : null;
+    if (!img || !input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        img.src = e.target.result;
+        img.style.display = 'block';
+    };
+    reader.readAsDataURL(input.files[0]);
 }
 
 function addGalleryRow() {
@@ -404,9 +457,9 @@ function addGalleryRow() {
     div.className = 'gallery-row';
     div.style.cssText = 'display:flex; gap:10px; margin-bottom:10px; align-items:center;';
     div.innerHTML = `
-        <img src="" style="width:50px; height:50px; object-fit:cover; border-radius:4px; display:none;">
-        <input type="text" name="gallery_urls[]" value="" placeholder="Hoặc dán URL ảnh..." style="flex:1.5;">
-        <input type="file" name="gallery_files[]" accept="image/*" style="flex:1;">
+        <img src="" style="width:50px; height:50px; object-fit:cover; border-radius:4px; display:none;" onerror="this.style.display='none'">
+        <input type="text" name="gallery_urls[]" value="" placeholder="Hoặc dán URL ảnh..." style="flex:1.5;" oninput="updateRowThumb(this)">
+        <input type="file" name="gallery_files[]" accept="image/*" style="flex:1;" onchange="updateFileThumb(this)">
         <input type="text" name="gallery_caps[]" placeholder="Caption (Nhãn)" style="flex:1.5;">
         <button type="button" onclick="this.parentElement.remove()" class="btn btn-secondary" style="padding: 5px 10px;"><i class="fa-solid fa-trash"></i></button>
     `;
@@ -419,9 +472,9 @@ function addSampleRow() {
     div.className = 'sample-row';
     div.style.cssText = 'display:flex; gap:10px; margin-bottom:10px; align-items:center;';
     div.innerHTML = `
-        <img src="" style="width:50px; height:50px; object-fit:cover; border-radius:4px; display:none;">
-        <input type="text" name="sample_urls[]" value="" placeholder="Hoặc dán URL ảnh..." style="flex:1.5;">
-        <input type="file" name="sample_files[]" accept="image/*" style="flex:1;">
+        <img src="" style="width:50px; height:50px; object-fit:cover; border-radius:4px; display:none;" onerror="this.style.display='none'">
+        <input type="text" name="sample_urls[]" value="" placeholder="Hoặc dán URL ảnh..." style="flex:1.5;" oninput="updateRowThumb(this)">
+        <input type="file" name="sample_files[]" accept="image/*" style="flex:1;" onchange="updateFileThumb(this)">
         <input type="text" name="sample_tags[]" placeholder="Thẻ (VD: Chân dung)" style="flex:1;">
         <input type="text" name="sample_texts[]" placeholder="Mô tả ảnh" style="flex:1.5;">
         <button type="button" onclick="this.parentElement.remove()" class="btn btn-secondary" style="padding: 5px 10px;"><i class="fa-solid fa-trash"></i></button>

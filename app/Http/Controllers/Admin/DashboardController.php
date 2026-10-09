@@ -28,7 +28,7 @@ class DashboardController extends Controller
         $pendingOrders = Order::where('status', 'pending')->count();
         $shippingOrders = Order::where('status', 'delivering')->count();
 
-        $validStatuses = ['finished'];
+        $validStatuses = ['finished', 'completed'];
 
         $revenueToday = $revenueWeek = $revenueMonth = 0;
         $revenueSeries = [];

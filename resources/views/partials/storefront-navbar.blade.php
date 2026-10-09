@@ -96,7 +96,7 @@
             <a href="{{ route('orders.index') }}" style="text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 12px;border-radius:8px;font-size:0.9rem;"><i class="fa-solid fa-clipboard-list"></i> Đơn hàng</a>
 
             <div class="sf-acc-dropdown" style="position:relative;display:inline-block;">
-                <a style="cursor:pointer;text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 12px;border-radius:8px;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;">
+                <a class="sf-acc-trigger" onclick="this.closest('.sf-acc-dropdown').classList.toggle('is-open')" style="cursor:pointer;text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 12px;border-radius:8px;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;user-select:none;">
                     @if(auth()->user()->avatar_url)
                         <img src="{{ auth()->user()->avatar_url }}" alt="Avatar" style="width:30px;height:30px;border-radius:50%;object-fit:cover;">
                     @else
@@ -105,17 +105,22 @@
                     <span>{{ auth()->user()->name }}</span>
                     <i class="fa-solid fa-chevron-down" style="font-size:0.7rem;"></i>
                 </a>
-                <div class="sf-acc-menu" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:white;min-width:200px;box-shadow:0 20px 40px rgba(0,0,0,0.12);border-radius:16px;z-index:100;border:1px solid var(--border);overflow:hidden;padding:8px 0;">
-                    <a href="{{ route('profile.edit') }}" style="color:var(--text-main);display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;font-size:0.9rem;transition:background 0.15s;"><i class="fa-solid fa-user" style="width:16px;color:var(--primary);"></i> Hồ sơ cá nhân</a>
-                    <a href="{{ route('orders.index') }}" style="color:var(--text-main);display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;font-size:0.9rem;transition:background 0.15s;"><i class="fa-solid fa-box" style="width:16px;color:var(--primary);"></i> Đơn hàng của tôi</a>
+                <div class="sf-acc-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:white;min-width:210px;box-shadow:0 20px 40px rgba(0,0,0,0.14);border-radius:14px;z-index:1000;border:1px solid var(--border);padding:8px 0;">
+                    <a href="{{ route('profile.edit') }}" style="color:var(--text-main);display:flex;align-items:center;gap:10px;padding:10px 18px;text-decoration:none;font-size:0.9rem;transition:background 0.15s;"><i class="fa-solid fa-user" style="width:16px;color:var(--primary);"></i> Hồ sơ cá nhân</a>
+                    <a href="{{ route('orders.index') }}" style="color:var(--text-main);display:flex;align-items:center;gap:10px;padding:10px 18px;text-decoration:none;font-size:0.9rem;transition:background 0.15s;"><i class="fa-solid fa-box" style="width:16px;color:var(--primary);"></i> Đơn hàng của tôi</a>
                     <div style="height:1px;background:var(--border);margin:4px 0;"></div>
                     <form method="POST" action="{{ route('logout') }}" style="margin:0;">
                         @csrf
-                        <button type="submit" style="width:100%;text-align:left;padding:10px 16px;background:transparent;border:none;cursor:pointer;color:#ef4444;font-size:0.9rem;font-weight:500;display:flex;align-items:center;gap:10px;"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i> Đăng xuất</button>
+                        <button type="submit" style="width:100%;text-align:left;padding:10px 18px;background:transparent;border:none;cursor:pointer;color:#ef4444;font-size:0.9rem;font-weight:600;display:flex;align-items:center;gap:10px;transition:background 0.15s;"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i> Đăng xuất</button>
                     </form>
                 </div>
             </div>
-            <style>.sf-acc-dropdown:hover .sf-acc-menu{display:block!important;}.sf-acc-menu a:hover{background:var(--surface2)!important;}</style>
+            <style>
+                .sf-acc-dropdown::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 14px; }
+                .sf-acc-dropdown:hover .sf-acc-menu, .sf-acc-dropdown.is-open .sf-acc-menu { display: block !important; }
+                .sf-acc-menu a:hover, .sf-acc-menu button:hover { background: var(--surface2) !important; color: var(--primary) !important; }
+                .sf-acc-menu form button:hover { color: #dc2626 !important; background: #fee2e2 !important; }
+            </style>
         @else
             <div class="sf-guest-block" style="display:flex;align-items:center;gap:0.75rem;">
                 <a href="{{ route('login') }}" style="text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 14px;border-radius:8px;font-size:0.9rem;"><i class="fa-solid fa-user"></i> Đăng nhập</a>
