@@ -72,9 +72,14 @@ class ExportStaticSite extends Command
         $pages = [
             '/'           => 'index.html',
             '/san-pham'   => 'san-pham/index.html',
+            '/products'   => 'products/index.html',
             '/gioi-thieu' => 'gioi-thieu/index.html',
+            '/about'      => 'about/index.html',
             '/ho-tro'     => 'ho-tro/index.html',
+            '/support'    => 'support/index.html',
+            '/contact'    => 'contact/index.html',
             '/tin-tuc'    => 'tin-tuc/index.html',
+            '/news'       => 'news/index.html',
         ];
 
         // Thêm chi tiết các sản phẩm ống kính
@@ -158,10 +163,15 @@ class ExportStaticSite extends Command
         // Thay thế các router link nội bộ
         $routes = [
             'href="/san-pham',
+            'href="/products',
             'href="/product/',
             'href="/tin-tuc',
+            'href="/news',
             'href="/gioi-thieu',
+            'href="/about',
             'href="/ho-tro',
+            'href="/support',
+            'href="/contact',
             'href="/cart',
             'href="/checkout',
             'href="/login',

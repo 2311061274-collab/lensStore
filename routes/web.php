@@ -110,16 +110,32 @@ Route::post('/payment/momo/ipn', [\App\Http\Controllers\MomoController::class, '
 
 // Storefront (Khách hàng)
 Route::get('/', [StorefrontController::class, 'index'])->name('storefront.index');
-Route::get('/product/{id}', [StorefrontController::class, 'show'])->name('storefront.show');
+
+// Danh sách sản phẩm (Song ngữ: /san-pham & /products)
 Route::get('/san-pham', [StorefrontController::class, 'productsPage'])->name('storefront.products');
+Route::get('/products', [StorefrontController::class, 'productsPage']);
+
+// Chi tiết sản phẩm (Song ngữ: /product/{id} & /san-pham/{id})
+Route::get('/product/{id}', [StorefrontController::class, 'show'])->name('storefront.show');
+Route::get('/san-pham/{id}', [StorefrontController::class, 'show']);
+
+// Tin tức (Song ngữ: /tin-tuc & /news)
 Route::get('/tin-tuc', [StorefrontController::class, 'news'])->name('storefront.news');
+Route::get('/news', [StorefrontController::class, 'news']);
 Route::get('/tin-tuc-ajax', [StorefrontController::class, 'newsAjax'])->name('storefront.news.ajax');
 Route::get('/tin-tuc/{id}', [StorefrontController::class, 'showNews'])->name('storefront.news.show');
+Route::get('/news/{id}', [StorefrontController::class, 'showNews']);
+
+// Giới thiệu (Song ngữ: /gioi-thieu & /about)
 Route::get('/gioi-thieu', [StorefrontController::class, 'about'])->name('storefront.about');
+Route::get('/about', [StorefrontController::class, 'about']);
+
+// Hỗ trợ khách hàng (Song ngữ: /ho-tro, /support & /contact)
 Route::get('/ho-tro', [StorefrontController::class, 'support'])->name('storefront.support');
+Route::get('/support', [StorefrontController::class, 'support']);
+Route::get('/contact', [StorefrontController::class, 'support']);
 
 // Redirect legacy admin URLs
-Route::redirect('/products', '/admin/products');
 Route::redirect('/categories', '/admin/categories');
 Route::redirect('/users', '/admin/users');
 Route::redirect('/vouchers', '/admin/vouchers');
