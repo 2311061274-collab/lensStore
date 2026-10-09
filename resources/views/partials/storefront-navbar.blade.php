@@ -40,10 +40,21 @@
         </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:0.75rem;">
+    <div id="sf-navbar-auth" style="display:flex;align-items:center;gap:0.75rem;"
+         data-is-auth="{{ auth()->check() ? '1' : '0' }}"
+         data-user-role="{{ auth()->check() ? auth()->user()->role : '' }}"
+         data-user-name="{{ auth()->check() ? auth()->user()->name : '' }}"
+         data-admin-url="{{ route('admin.dashboard') }}"
+         data-orders-url="{{ route('orders.index') }}"
+         data-profile-url="{{ route('profile.edit') }}"
+         data-cart-url="{{ route('cart.index') }}"
+         data-checkout-url="{{ route('checkout.index') }}"
+         data-login-url="{{ route('login') }}"
+         data-register-url="{{ route('register') }}"
+         data-logout-url="{{ route('logout') }}">
         @auth
             @if(in_array(auth()->user()->role, ['admin','staff']))
-                <a href="{{ route('admin.dashboard') }}" style="text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 12px;border-radius:8px;transition:all 0.2s;font-size:0.9rem;"><i class="fa-solid fa-gauge"></i> Quản lý</a>
+                <a href="{{ route('admin.dashboard') }}" class="sf-admin-btn" style="text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 12px;border-radius:8px;transition:all 0.2s;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;"><i class="fa-solid fa-gauge"></i> Quản lý</a>
             @endif
             <div class="sf-cart-dropdown" style="position:relative;display:inline-block;">
                 <a href="{{ route('cart.index') }}" style="position:relative;cursor:pointer;text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 12px;border-radius:8px;transition:all 0.2s;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;">
@@ -91,7 +102,7 @@
                     @else
                         <span style="width:30px;height:30px;background:var(--primary);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.8rem;">{{ mb_substr(auth()->user()->name, 0, 1) }}</span>
                     @endif
-                    {{ auth()->user()->name }}
+                    <span>{{ auth()->user()->name }}</span>
                     <i class="fa-solid fa-chevron-down" style="font-size:0.7rem;"></i>
                 </a>
                 <div class="sf-acc-menu" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:white;min-width:200px;box-shadow:0 20px 40px rgba(0,0,0,0.12);border-radius:16px;z-index:100;border:1px solid var(--border);overflow:hidden;padding:8px 0;">
@@ -106,8 +117,21 @@
             </div>
             <style>.sf-acc-dropdown:hover .sf-acc-menu{display:block!important;}.sf-acc-menu a:hover{background:var(--surface2)!important;}</style>
         @else
-            <a href="{{ route('login') }}" style="text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 14px;border-radius:8px;font-size:0.9rem;"><i class="fa-solid fa-user"></i> Đăng nhập</a>
-            <a href="{{ route('register') }}" style="text-decoration:none;background:var(--primary);color:white;font-weight:600;padding:8px 18px;border-radius:10px;font-size:0.9rem;transition:background 0.2s;"><i class="fa-solid fa-user-plus"></i> Đăng ký</a>
+            <div class="sf-guest-block" style="display:flex;align-items:center;gap:0.75rem;">
+                <a href="{{ route('login') }}" style="text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 14px;border-radius:8px;font-size:0.9rem;"><i class="fa-solid fa-user"></i> Đăng nhập</a>
+                <a href="{{ route('register') }}" style="text-decoration:none;background:var(--primary);color:white;font-weight:600;padding:8px 18px;border-radius:10px;font-size:0.9rem;transition:background 0.2s;"><i class="fa-solid fa-user-plus"></i> Đăng ký</a>
+            </div>
         @endauth
     </div>
+    <script>
+    (function() {
+        try {
+            var isAuth = "{{ auth()->check() ? '1' : '0' }}";
+            if (isAuth === '1') {
+                localStorage.setItem('ls_user_role', "{{ auth()->user()->role ?? '' }}");
+                localStorage.setItem('ls_user_name', "{{ auth()->user()->name ?? '' }}");
+            }
+        } catch(e) {}
+    })();
+    </script>
 </nav>

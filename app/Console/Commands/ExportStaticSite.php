@@ -257,7 +257,7 @@ class ExportStaticSite extends Command
             }
 
             // Chỉnh sửa & Chi tiết sản phẩm trong Admin
-            foreach (Product::take(10)->get() as $p) {
+            foreach (Product::all() as $p) {
                 $allPages['/admin/products/' . $p->id . '/edit'] = ['slug' => 'admin/products/' . $p->id . '/edit', 'user' => $adminUser, 'session' => []];
                 $allPages['/admin/products/' . $p->id] = ['slug' => 'admin/products/' . $p->id, 'user' => $adminUser, 'session' => []];
             }
@@ -274,7 +274,7 @@ class ExportStaticSite extends Command
             }
 
             // Chi tiết khách hàng
-            foreach (\App\Models\User::where('role', 'customer')->take(5)->get() as $cust) {
+            foreach (\App\Models\User::where('role', 'customer')->get() as $cust) {
                 $allPages['/admin/customers/' . $cust->id] = ['slug' => 'admin/customers/' . $cust->id, 'user' => $adminUser, 'session' => []];
             }
 
@@ -284,7 +284,7 @@ class ExportStaticSite extends Command
             }
 
             // Chỉnh sửa tài khoản người dùng
-            foreach (\App\Models\User::take(5)->get() as $u) {
+            foreach (\App\Models\User::all() as $u) {
                 $allPages['/admin/users/' . $u->id . '/edit'] = ['slug' => 'admin/users/' . $u->id . '/edit', 'user' => $adminUser, 'session' => []];
                 $allPages['/admin/users/' . $u->id] = ['slug' => 'admin/users/' . $u->id, 'user' => $adminUser, 'session' => []];
             }
@@ -295,7 +295,7 @@ class ExportStaticSite extends Command
             }
 
             // Chỉnh sửa bài viết tin tức
-            foreach (\App\Models\News::take(5)->get() as $n) {
+            foreach (\App\Models\News::all() as $n) {
                 $allPages['/admin/news/' . $n->id . '/edit'] = ['slug' => 'admin/news/' . $n->id . '/edit', 'user' => $adminUser, 'session' => []];
             }
         } catch (\Throwable $e) {
@@ -617,10 +617,12 @@ class ExportStaticSite extends Command
                     if (email.includes('admin') || email === 'admin@example.com') {
                         // Quyền Quản trị viên -> Lưu role và chuyển thẳng vào Admin Dashboard
                         localStorage.setItem('ls_user_role', 'admin');
+                        localStorage.setItem('ls_user_name', 'Administrator');
                         window.location.href = BASE_URL + '/admin/';
                     } else {
                         // Khách hàng thông thường -> Lưu role và chuyển vào Trang Khách hàng
                         localStorage.setItem('ls_user_role', 'customer');
+                        localStorage.setItem('ls_user_name', 'Khách hàng');
                         window.location.href = BASE_URL + '/orders/';
                     }
                 } else if (action.includes('register')) {
@@ -632,6 +634,7 @@ class ExportStaticSite extends Command
                 } else if (action.includes('logout')) {
                     // Đăng xuất -> Xóa role và về Trang chủ
                     localStorage.removeItem('ls_user_role');
+                    localStorage.removeItem('ls_user_name');
                     window.location.href = HOME_URL;
                 } else if (action.includes('return')) {
                     // Đổi trả đơn hàng -> về trang đơn hàng
@@ -670,13 +673,78 @@ class ExportStaticSite extends Command
         });
     }
 
+    // 6. Đồng bộ trạng thái đăng nhập Navbar (Admin / Customer / Guest) trên toàn bộ trang
+    function syncNavbarAuthState() {
+        const role = localStorage.getItem('ls_user_role');
+        const name = localStorage.getItem('ls_user_name') || (role === 'admin' ? 'Administrator' : 'Khách hàng');
+        const authContainer = document.getElementById('sf-navbar-auth') || document.querySelector('.sf-nav-right, .navbar .nav-right, nav > div:last-child');
+        if (!authContainer) return;
+
+        // Nếu đã đăng nhập (role là admin hoặc customer)
+        if (role === 'admin' || role === 'customer') {
+            const guestBlock = authContainer.querySelector('.sf-guest-block');
+            // Nếu container đang chứa nút Đăng nhập / Đăng ký
+            if (guestBlock || authContainer.querySelector('a[href*="login"]') || authContainer.querySelector('a[href*="register"]')) {
+                const adminLink = (role === 'admin')
+                    ? `<a href="\${BASE_URL}/admin/" class="sf-admin-btn" style="text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;transition:all 0.2s;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;"><i class="fa-solid fa-gauge"></i> Quản lý</a>`
+                    : '';
+                const initial = name ? name.charAt(0).toUpperCase() : (role === 'admin' ? 'A' : 'K');
+                const cartCount = parseInt(localStorage.getItem('ls_cart_count') || '1', 10);
+
+                authContainer.innerHTML = `
+                    \${adminLink}
+                    <div class="sf-cart-dropdown" style="position:relative;display:inline-block;">
+                        <a href="\${BASE_URL}/cart/" style="position:relative;cursor:pointer;text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;transition:all 0.2s;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;">
+                            <i class="fa-solid fa-cart-shopping"></i> Giỏ hàng
+                            <span style="position:absolute;top:-4px;right:-2px;background:#ef4444;color:white;border-radius:50%;padding:1px 5px;font-size:0.65rem;font-weight:700;line-height:1.4;">\${cartCount}</span>
+                        </a>
+                    </div>
+                    <a href="\${BASE_URL}/orders/" style="text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;font-size:0.9rem;"><i class="fa-solid fa-clipboard-list"></i> Đơn hàng</a>
+                    <div class="sf-acc-dropdown" style="position:relative;display:inline-block;">
+                        <a class="sf-acc-trigger" style="cursor:pointer;text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;">
+                            <span style="width:30px;height:30px;background:var(--primary,#4f46e5);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.8rem;">\${initial}</span>
+                            <span>\${name}</span>
+                            <i class="fa-solid fa-chevron-down" style="font-size:0.7rem;"></i>
+                        </a>
+                        <div class="sf-acc-menu" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:white;min-width:200px;box-shadow:0 20px 40px rgba(0,0,0,0.12);border-radius:16px;z-index:100;border:1px solid var(--border,#e2e8f0);overflow:hidden;padding:8px 0;">
+                            <a href="\${BASE_URL}/profile/" style="color:var(--text-main,#1e293b);display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;font-size:0.9rem;"><i class="fa-solid fa-user" style="width:16px;color:var(--primary,#4f46e5);"></i> Hồ sơ cá nhân</a>
+                            <a href="\${BASE_URL}/orders/" style="color:var(--text-main,#1e293b);display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;font-size:0.9rem;"><i class="fa-solid fa-box" style="width:16px;color:var(--primary,#4f46e5);"></i> Đơn hàng của tôi</a>
+                            <div style="height:1px;background:var(--border,#e2e8f0);margin:4px 0;"></div>
+                            <a href="#" class="ls-logout-btn" style="color:#ef4444;display:flex;align-items:center;gap:10px;padding:10px 16px;text-decoration:none;font-size:0.9rem;font-weight:500;cursor:pointer;"><i class="fa-solid fa-right-from-bracket" style="width:16px;"></i> Đăng xuất</a>
+                        </div>
+                    </div>
+                `;
+
+                const accDropdown = authContainer.querySelector('.sf-acc-dropdown');
+                const accMenu = authContainer.querySelector('.sf-acc-menu');
+                if (accDropdown && accMenu) {
+                    accDropdown.addEventListener('mouseenter', () => accMenu.style.display = 'block');
+                    accDropdown.addEventListener('mouseleave', () => accMenu.style.display = 'none');
+                }
+
+                const logoutBtn = authContainer.querySelector('.ls-logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        localStorage.removeItem('ls_user_role');
+                        localStorage.removeItem('ls_user_name');
+                        window.location.href = HOME_URL;
+                    });
+                }
+            }
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
+        syncNavbarAuthState();
         syncCartCount();
         initAddToCart();
         initWishlist();
         initLiveFilter();
         initFormNavigation();
     });
+    // Kích hoạt ngay tức thì để chống nhấp nháy giao diện
+    syncNavbarAuthState();
 })();
 </script>
 HTML;
@@ -699,6 +767,17 @@ HTML;
     <title>404 - Không tìm thấy trang | LensStore</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+    (function() {
+        var path = window.location.pathname;
+        if (path.endsWith('/') && path.length > 1) {
+            var stripped = path.slice(0, -1);
+            if (stripped.endsWith('.html')) {
+                window.location.replace(stripped);
+            }
+        }
+    })();
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
         .card { max-width: 500px; padding: 3rem 2rem; background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); }

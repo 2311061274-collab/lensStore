@@ -431,5 +431,15 @@
     </div>
 
     @include('partials.customer-chat')
+    @auth
+    <script>
+    (function () {
+        try {
+            localStorage.setItem('ls_user_role', '{{ auth()->user()->role }}');
+            localStorage.setItem('ls_user_name', @json(auth()->user()->name));
+        } catch (e) {}
+    })();
+    </script>
+    @endauth
 </body>
 </html>

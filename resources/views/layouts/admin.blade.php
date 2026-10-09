@@ -963,5 +963,13 @@
     </script>
     @endif
     @endauth
+    <script>
+    (function () {
+        try {
+            localStorage.setItem('ls_user_role', 'admin');
+            localStorage.setItem('ls_user_name', @json(auth()->user()->name ?? 'Administrator'));
+        } catch (e) {}
+    })();
+    </script>
 </body>
 </html>
