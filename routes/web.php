@@ -156,8 +156,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
         Route::resource('products', ProductController::class);
         Route::post('products/bulk', [ProductController::class, 'bulkUpdate'])->name('products.bulk');
         
-        // Quản lý kho
-        Route::resource('goods_receipts', \App\Http\Controllers\Admin\GoodsReceiptController::class);
+        Route::resource('goods_receipts', \App\Http\Controllers\Admin\GoodsReceiptController::class)->except(['edit', 'update', 'destroy']);
         Route::post('goods_receipts/{goods_receipt}/complete', [\App\Http\Controllers\Admin\GoodsReceiptController::class, 'complete'])->name('goods_receipts.complete');
 
         Route::resource('goods_issues', \App\Http\Controllers\Admin\GoodsIssueController::class)->only(['index', 'create', 'store']);

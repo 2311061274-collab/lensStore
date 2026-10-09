@@ -69,7 +69,10 @@ class ExportStaticSite extends Command
         File::put($distDir . '/.nojekyll', '');
         $this->line("   - Đã tạo .nojekyll");
 
-        // 3. Danh sách các trang tĩnh cần render (Key: Route path, Value: slug)
+        // 3. Danh sách các trang tĩnh cần render (Key: Route path, Value: array config)
+        $allPages = [];
+
+        // Trang công khai Storefront
         $publicPages = [
             '/'                 => '',
             '/san-pham'         => 'san-pham',
@@ -86,57 +89,44 @@ class ExportStaticSite extends Command
             '/forgot-password'  => 'forgot-password',
         ];
 
-        // Trang trải nghiệm giỏ hàng & tài khoản khách hàng
-        $authPages = [
-            '/cart'             => 'cart',
-            '/checkout'         => 'checkout',
-            '/wishlist'         => 'wishlist',
-            '/orders'           => 'orders',
-            '/profile'          => 'profile',
-        ];
-
-        // Trang quản trị hệ thống Admin (yêu cầu session Admin với đầy đủ tính năng)
-        $adminPages = [
-            '/admin'                 => 'admin',
-            '/admin/orders'          => 'admin/orders',
-            '/admin/products'        => 'admin/products',
-            '/admin/categories'      => 'admin/categories',
-            '/admin/customers'       => 'admin/customers',
-            '/admin/reviews'         => 'admin/reviews',
-            '/admin/returns'         => 'admin/returns',
-            '/admin/reports'         => 'admin/reports',
-            '/admin/roles'           => 'admin/roles',
-            '/admin/users'           => 'admin/users',
-            '/admin/vouchers'        => 'admin/vouchers',
-            '/admin/news'            => 'admin/news',
-            '/admin/goods_receipts'  => 'admin/goods_receipts',
-            '/admin/goods_issues'    => 'admin/goods_issues',
-            '/admin/qc_inspections'  => 'admin/qc_inspections',
-        ];
-
-        // Thu thập toàn bộ sản phẩm ống kính từ database
-        try {
-            $products = Product::all();
-            foreach ($products as $prod) {
-                $publicPages['/product/' . $prod->id] = 'product/' . $prod->id;
-                $publicPages['/san-pham/' . $prod->id] = 'san-pham/' . $prod->id;
-            }
-            $this->info("   - Đã thu thập " . $products->count() . " sản phẩm ống kính.");
-        } catch (\Throwable $e) {
-            $this->warn("   ! Không thể đọc danh sách Product từ database: " . $e->getMessage());
+        foreach ($publicPages as $routePath => $slug) {
+            $allPages[$routePath] = ['slug' => $slug, 'user' => null, 'session' => []];
         }
 
-        // Thu thập toàn bộ bài viết tin tức từ database
-        try {
-            $newsArticles = News::all();
-            foreach ($newsArticles as $article) {
-                $publicPages['/tin-tuc/' . $article->id] = 'tin-tuc/' . $article->id;
-                $publicPages['/news/' . $article->id] = 'news/' . $article->id;
-            }
-            $this->info("   - Đã thu thập " . $newsArticles->count() . " bài viết tin tức.");
-        } catch (\Throwable $e) {
-            $this->warn("   ! Không thể đọc danh sách News từ database: " . $e->getMessage());
-        }
+        // Trang xác thực đặc thù có session giả lập
+        $allPages['/email/verify'] = [
+            'slug' => 'email/verify',
+            'user' => null,
+            'session' => [
+                'pending_registration' => [
+                    'name' => 'Demo User',
+                    'email' => 'demo@example.com',
+                    'phone' => '0901234567',
+                ],
+                'otp_code' => '123456',
+                'otp_email' => 'demo@example.com',
+                'otp_expires_at' => now()->addMinutes(15),
+            ],
+        ];
+
+        $allPages['/forgot-password/verify'] = [
+            'slug' => 'forgot-password/verify',
+            'user' => null,
+            'session' => [
+                'reset_password_email' => 'demo@example.com',
+                'otp_code' => '123456',
+                'otp_expires_at' => now()->addMinutes(15),
+            ],
+        ];
+
+        $allPages['/reset-password'] = [
+            'slug' => 'reset-password',
+            'user' => null,
+            'session' => [
+                'reset_password_email' => 'demo@example.com',
+                'reset_password_verified' => true,
+            ],
+        ];
 
         // Chuẩn bị tài khoản Admin và Khách hàng mẫu
         $adminUser = null;
@@ -158,16 +148,158 @@ class ExportStaticSite extends Command
             $this->warn("   ! Không thể nạp Demo Users: " . $e->getMessage());
         }
 
-        // Ghép toàn bộ trang để render
-        $allPages = [];
-        foreach ($publicPages as $routePath => $slug) {
-            $allPages[$routePath] = ['slug' => $slug, 'user' => null];
+        // Thu thập toàn bộ sản phẩm ống kính từ database
+        try {
+            $products = Product::all();
+            foreach ($products as $prod) {
+                $allPages['/product/' . $prod->id] = ['slug' => 'product/' . $prod->id, 'user' => null, 'session' => []];
+                $allPages['/san-pham/' . $prod->id] = ['slug' => 'san-pham/' . $prod->id, 'user' => null, 'session' => []];
+            }
+            $this->info("   - Đã thu thập " . $products->count() . " sản phẩm ống kính.");
+        } catch (\Throwable $e) {
+            $this->warn("   ! Không thể đọc danh sách Product từ database: " . $e->getMessage());
         }
-        foreach ($authPages as $routePath => $slug) {
-            $allPages[$routePath] = ['slug' => $slug, 'user' => $customerUser];
+
+        // Thu thập toàn bộ bài viết tin tức từ database
+        try {
+            $newsArticles = News::all();
+            foreach ($newsArticles as $article) {
+                $allPages['/tin-tuc/' . $article->id] = ['slug' => 'tin-tuc/' . $article->id, 'user' => null, 'session' => []];
+                $allPages['/news/' . $article->id] = ['slug' => 'news/' . $article->id, 'user' => null, 'session' => []];
+            }
+            $this->info("   - Đã thu thập " . $newsArticles->count() . " bài viết tin tức.");
+        } catch (\Throwable $e) {
+            $this->warn("   ! Không thể đọc danh sách News từ database: " . $e->getMessage());
         }
-        foreach ($adminPages as $routePath => $slug) {
-            $allPages[$routePath] = ['slug' => $slug, 'user' => $adminUser];
+
+        // Trang trải nghiệm giỏ hàng & tài khoản khách hàng
+        $customerPages = [
+            '/cart'             => 'cart',
+            '/checkout'         => 'checkout',
+            '/wishlist'         => 'wishlist',
+            '/orders'           => 'orders',
+            '/profile'          => 'profile',
+        ];
+
+        foreach ($customerPages as $routePath => $slug) {
+            $allPages[$routePath] = ['slug' => $slug, 'user' => $customerUser, 'session' => []];
+        }
+
+        // Đơn hàng của khách hàng & các form hành động (chi tiết, đổi trả, đánh giá)
+        try {
+            $orders = \App\Models\Order::all();
+            foreach ($orders as $ord) {
+                $allPages['/orders/' . $ord->id] = [
+                    'slug' => 'orders/' . $ord->id,
+                    'user' => $customerUser,
+                    'session' => [],
+                ];
+
+                // Form đánh giá
+                $allPages['/orders/' . $ord->id . '/review'] = [
+                    'slug' => 'orders/' . $ord->id . '/review',
+                    'user' => $customerUser,
+                    'session' => [],
+                ];
+
+                // Form đổi trả (cho đơn không có return request trước đó)
+                if (!\App\Models\ReturnRequest::where('order_id', $ord->id)->exists() && $ord->status === 'completed') {
+                    $allPages['/orders/' . $ord->id . '/return'] = [
+                        'slug' => 'orders/' . $ord->id . '/return',
+                        'user' => $customerUser,
+                        'session' => [],
+                    ];
+                }
+            }
+            $this->info("   - Đã thu thập " . $orders->count() . " đơn hàng khách hàng.");
+        } catch (\Throwable $e) {
+            $this->warn("   ! Lỗi thu thập đơn hàng: " . $e->getMessage());
+        }
+
+        // Trang quản trị hệ thống Admin
+        $adminBasePages = [
+            '/admin'                 => 'admin',
+            '/admin/orders'          => 'admin/orders',
+            '/admin/products'        => 'admin/products',
+            '/admin/products/create' => 'admin/products/create',
+            '/admin/categories'      => 'admin/categories',
+            '/admin/categories/create' => 'admin/categories/create',
+            '/admin/customers'       => 'admin/customers',
+            '/admin/reviews'         => 'admin/reviews',
+            '/admin/returns'         => 'admin/returns',
+            '/admin/reports'         => 'admin/reports',
+            '/admin/roles'           => 'admin/roles',
+            '/admin/roles/create'    => 'admin/roles/create',
+            '/admin/users'           => 'admin/users',
+            '/admin/users/create'    => 'admin/users/create',
+            '/admin/vouchers'        => 'admin/vouchers',
+            '/admin/vouchers/create' => 'admin/vouchers/create',
+            '/admin/news'            => 'admin/news',
+            '/admin/news/create'     => 'admin/news/create',
+            '/admin/goods_receipts'  => 'admin/goods_receipts',
+            '/admin/goods_receipts/create' => 'admin/goods_receipts/create',
+            '/admin/goods_issues'    => 'admin/goods_issues',
+            '/admin/goods_issues/create' => 'admin/goods_issues/create',
+            '/admin/qc_inspections'  => 'admin/qc_inspections',
+            '/admin/qc_inspections/create' => 'admin/qc_inspections/create',
+            '/admin/chat'            => 'admin/chat',
+        ];
+
+        foreach ($adminBasePages as $routePath => $slug) {
+            $allPages[$routePath] = ['slug' => $slug, 'user' => $adminUser, 'session' => []];
+        }
+
+        // Thu thập các trang Show/Edit trong Admin cho từng bản ghi thực tế
+        try {
+            // Chi tiết đơn hàng trong Admin
+            foreach (\App\Models\Order::all() as $ord) {
+                $allPages['/admin/orders/' . $ord->id] = ['slug' => 'admin/orders/' . $ord->id, 'user' => $adminUser, 'session' => []];
+            }
+
+            // Chỉnh sửa & Chi tiết sản phẩm trong Admin
+            foreach (Product::take(10)->get() as $p) {
+                $allPages['/admin/products/' . $p->id . '/edit'] = ['slug' => 'admin/products/' . $p->id . '/edit', 'user' => $adminUser, 'session' => []];
+                $allPages['/admin/products/' . $p->id] = ['slug' => 'admin/products/' . $p->id, 'user' => $adminUser, 'session' => []];
+            }
+
+            // Chỉnh sửa & Chi tiết danh mục
+            foreach (\App\Models\Category::all() as $cat) {
+                $allPages['/admin/categories/' . $cat->id . '/edit'] = ['slug' => 'admin/categories/' . $cat->id . '/edit', 'user' => $adminUser, 'session' => []];
+                $allPages['/admin/categories/' . $cat->id] = ['slug' => 'admin/categories/' . $cat->id, 'user' => $adminUser, 'session' => []];
+            }
+
+            // Chi tiết phiếu nhập kho
+            foreach (\App\Models\GoodsReceipt::all() as $gr) {
+                $allPages['/admin/goods_receipts/' . $gr->id] = ['slug' => 'admin/goods_receipts/' . $gr->id, 'user' => $adminUser, 'session' => []];
+            }
+
+            // Chi tiết khách hàng
+            foreach (\App\Models\User::where('role', 'customer')->take(5)->get() as $cust) {
+                $allPages['/admin/customers/' . $cust->id] = ['slug' => 'admin/customers/' . $cust->id, 'user' => $adminUser, 'session' => []];
+            }
+
+            // Chỉnh sửa vai trò (Role)
+            foreach (\Spatie\Permission\Models\Role::all() as $role) {
+                $allPages['/admin/roles/' . $role->id . '/edit'] = ['slug' => 'admin/roles/' . $role->id . '/edit', 'user' => $adminUser, 'session' => []];
+            }
+
+            // Chỉnh sửa tài khoản người dùng
+            foreach (\App\Models\User::take(5)->get() as $u) {
+                $allPages['/admin/users/' . $u->id . '/edit'] = ['slug' => 'admin/users/' . $u->id . '/edit', 'user' => $adminUser, 'session' => []];
+                $allPages['/admin/users/' . $u->id] = ['slug' => 'admin/users/' . $u->id, 'user' => $adminUser, 'session' => []];
+            }
+
+            // Chỉnh sửa mã giảm giá
+            foreach (\App\Models\Voucher::all() as $v) {
+                $allPages['/admin/vouchers/' . $v->id . '/edit'] = ['slug' => 'admin/vouchers/' . $v->id . '/edit', 'user' => $adminUser, 'session' => []];
+            }
+
+            // Chỉnh sửa bài viết tin tức
+            foreach (\App\Models\News::take(5)->get() as $n) {
+                $allPages['/admin/news/' . $n->id . '/edit'] = ['slug' => 'admin/news/' . $n->id . '/edit', 'user' => $adminUser, 'session' => []];
+            }
+        } catch (\Throwable $e) {
+            $this->warn("   ! Lỗi thu thập chi tiết CRUD Admin: " . $e->getMessage());
         }
 
         // 4. Render từng trang và ghi tệp Dual-Path
@@ -177,6 +309,7 @@ class ExportStaticSite extends Command
         foreach ($allPages as $routePath => $pageConfig) {
             $slug = $pageConfig['slug'];
             $targetUser = $pageConfig['user'];
+            $sessionData = $pageConfig['session'] ?? [];
             try {
                 $request = Request::create($routePath, 'GET');
                 app()->instance('request', $request);
@@ -185,6 +318,16 @@ class ExportStaticSite extends Command
                     auth()->login($targetUser);
                 } else {
                     auth()->logout();
+                }
+
+                if (!empty($sessionData)) {
+                    $session = app('session')->driver();
+                    $session->setId('static-export-session');
+                    $session->start();
+                    foreach ($sessionData as $k => $v) {
+                        $session->put($k, $v);
+                    }
+                    $request->setLaravelSession($session);
                 }
 
                 $response = $kernel->handle($request);
@@ -245,7 +388,7 @@ class ExportStaticSite extends Command
         $targetBase = !empty($basePrefix) ? $basePrefix : '';
         $homeUrl = !empty($targetBase) ? $targetBase . '/' : '/';
 
-        // 1. Xóa bỏ hoàn toàn mọi URL tuyệt đối localhost
+        // 1. Xóa bỏ hoàn toàn mọi URL tuyệt đối localhost (kể cả escape slashes trong JS)
         $localhostPatterns = [
             'http://localhost:8000',
             'https://localhost:8000',
@@ -255,11 +398,24 @@ class ExportStaticSite extends Command
             'https://localhost',
             'http://127.0.0.1',
             'https://127.0.0.1',
+            'http:\/\/localhost:8000',
+            'https:\/\/localhost:8000',
+            'http:\/\/127.0.0.1:8000',
+            'https:\/\/127.0.0.1:8000',
+            'http:\/\/localhost',
+            'https:\/\/localhost',
+            'http:\/\/127.0.0.1',
+            'https:\/\/127.0.0.1',
         ];
 
+        $escapedTargetBase = str_replace('/', '\/', $targetBase);
+
         foreach ($localhostPatterns as $lh) {
-            $html = str_replace($lh . '/', $targetBase . '/', $html);
-            $html = str_replace($lh, $targetBase . '/', $html);
+            $isEscaped = str_contains($lh, '\/');
+            $replacement = $isEscaped ? $escapedTargetBase : $targetBase;
+            $slash = $isEscaped ? '\/' : '/';
+            $html = str_replace($lh . $slash, $replacement . $slash, $html);
+            $html = str_replace($lh, $replacement, $html);
         }
 
         // 2. Xử lý các liên kết tương đối bắt đầu bằng /
@@ -276,7 +432,7 @@ class ExportStaticSite extends Command
             $internalRoutes = [
                 'san-pham', 'products', 'gioi-thieu', 'about',
                 'ho-tro', 'support', 'contact', 'tin-tuc', 'news',
-                'product', 'cart', 'checkout', 'login', 'register', 'forgot-password', 'orders', 'wishlist', 'profile', 'admin'
+                'product', 'cart', 'checkout', 'login', 'register', 'forgot-password', 'orders', 'wishlist', 'profile', 'admin', 'email', 'reset-password'
             ];
 
             foreach ($internalRoutes as $r) {
@@ -290,7 +446,7 @@ class ExportStaticSite extends Command
         }
 
         // 3. Đảm bảo các link thư mục trên GitHub Pages có trailing slash để tải index.html đúng
-        $html = preg_replace('/href="(' . preg_quote($targetBase, '/') . '\/(?:gioi-thieu|about|ho-tro|support|contact|san-pham|products|tin-tuc|news|login|register|forgot-password|cart|checkout|wishlist|orders|profile|admin(?:\/[a-zA-Z0-9_\-]+)?))"/', 'href="$1/"', $html);
+        $html = preg_replace('/href="(' . preg_quote($targetBase, '/') . '\/(?:gioi-thieu|about|ho-tro|support|contact|san-pham|products|tin-tuc|news|login|register|forgot-password|cart|checkout|wishlist|orders|profile|email|reset-password|admin(?:\/[a-zA-Z0-9_\-]+)*))"/', 'href="$1/"', $html);
 
         // 4. Nhúng Bộ điều khiển tương tác Client-Side tĩnh trước </body>
         $staticScript = $this->getStaticEnhancementsScript($basePrefix);
@@ -468,8 +624,8 @@ class ExportStaticSite extends Command
                         window.location.href = BASE_URL + '/orders/';
                     }
                 } else if (action.includes('register')) {
-                    // Đăng ký -> Chuyển sang Đăng nhập
-                    window.location.href = BASE_URL + '/login/';
+                    // Đăng ký -> Chuyển sang OTP Verify hoặc Đăng nhập
+                    window.location.href = BASE_URL + '/email/verify/';
                 } else if (action.includes('checkout') || form.id === 'checkout-form') {
                     // Đặt hàng -> Chuyển sang trang Đơn hàng
                     window.location.href = BASE_URL + '/orders/';
@@ -477,12 +633,36 @@ class ExportStaticSite extends Command
                     // Đăng xuất -> Xóa role và về Trang chủ
                     localStorage.removeItem('ls_user_role');
                     window.location.href = HOME_URL;
+                } else if (action.includes('return')) {
+                    // Đổi trả đơn hàng -> về trang đơn hàng
+                    window.location.href = BASE_URL + '/orders/';
+                } else if (action.includes('review')) {
+                    // Đánh giá đơn hàng -> về trang đơn hàng
+                    window.location.href = BASE_URL + '/orders/';
+                } else if (action.includes('admin/products')) {
+                    window.location.href = BASE_URL + '/admin/products/';
+                } else if (action.includes('admin/categories')) {
+                    window.location.href = BASE_URL + '/admin/categories/';
+                } else if (action.includes('admin/vouchers')) {
+                    window.location.href = BASE_URL + '/admin/vouchers/';
+                } else if (action.includes('admin/news')) {
+                    window.location.href = BASE_URL + '/admin/news/';
+                } else if (action.includes('admin/roles')) {
+                    window.location.href = BASE_URL + '/admin/roles/';
+                } else if (action.includes('admin/users')) {
+                    window.location.href = BASE_URL + '/admin/users/';
+                } else if (action.includes('admin/goods_receipts')) {
+                    window.location.href = BASE_URL + '/admin/goods_receipts/';
+                } else if (action.includes('admin/goods_issues')) {
+                    window.location.href = BASE_URL + '/admin/goods_issues/';
+                } else if (action.includes('admin/qc_inspections')) {
+                    window.location.href = BASE_URL + '/admin/qc_inspections/';
                 } else {
                     // Các form khác: Phản hồi nút submit
                     const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
                     if (submitBtn) {
                         const prev = submitBtn.textContent;
-                        submitBtn.textContent = '✓ Hoàn tất';
+                        submitBtn.textContent = '✓ Hoàn tất thành công';
                         setTimeout(() => { submitBtn.textContent = prev; }, 2000);
                     }
                 }

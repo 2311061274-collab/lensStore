@@ -22,7 +22,14 @@ class QcInspectionController extends Controller
     public function create(Request $request)
     {
         $returnId = $request->query('return_request_id');
-        $returnRequest = ReturnRequest::with('order.items.product')->findOrFail($returnId);
+        $returnRequest = ReturnRequest::with('order.items.product')->find($returnId)
+            ?: ReturnRequest::with('order.items.product')->where('status', 'approved')->first()
+            ?: ReturnRequest::with('order.items.product')->first();
+
+        if (!$returnRequest) {
+            return redirect()->route('admin.qc_inspections.index')->with('error', 'Chưa có yêu cầu trả hàng nào cần kiểm định.');
+        }
+
         return view('admin.qc_inspections.create', compact('returnRequest'));
     }
 
