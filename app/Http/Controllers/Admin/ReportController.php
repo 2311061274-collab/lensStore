@@ -132,13 +132,14 @@ class ReportController extends Controller
             ->get();
 
         $deadStock = Product::where('stock', '>', 0)
-            ->whereDoesntHave('orderItems', function ($q) {
+            ->whereDoesntHave('orderItems', function ($q) use ($validStatuses) {
                 $q->whereHas('order', fn ($o) => $o->where('created_at', '>=', now()->subDays(90))
                     ->whereIn('status', $validStatuses));
             })
             ->orderByDesc('stock')
             ->limit(10)
             ->get();
+
             
         $lowStockWarning = Product::where('stock', '<', 5)
             ->orderBy('stock')

@@ -71,10 +71,35 @@
     <button type="submit" class="btn-primary">
         <i class="fa-solid fa-right-to-bracket"></i> Đăng nhập
     </button>
+
+    {{-- Chọn nhanh tài khoản kiểm thử Demo --}}
+    <div style="margin-top:1.25rem;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px dashed rgba(255,255,255,0.2);border-radius:12px;font-size:0.83rem;color:#cbd5e1;">
+        <div style="font-weight:600;margin-bottom:8px;color:#f59e0b;display:flex;align-items:center;gap:6px;">
+            <i class="fa-solid fa-bolt"></i> Chọn nhanh tài khoản kiểm thử:
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" onclick="fillLoginCredentials('admin@example.com','password')" style="background:#4f46e5;color:white;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+                <i class="fa-solid fa-shield-halved"></i> 👑 Admin (Vào Dashboard)
+            </button>
+            <button type="button" onclick="fillLoginCredentials('user@example.com','password')" style="background:#0d9488;color:white;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+                <i class="fa-solid fa-user"></i> 👤 Khách hàng (Vào Trang User)
+            </button>
+        </div>
+    </div>
+
+    <script>
+    function fillLoginCredentials(email, pwd) {
+        var emailInput = document.getElementById('email');
+        var pwdInput = document.getElementById('password');
+        if (emailInput) emailInput.value = email;
+        if (pwdInput) pwdInput.value = pwd;
+    }
+    </script>
 </form>
 
 <div class="auth-footer" style="margin-top:1.8rem;">
     Chưa có tài khoản? <a href="{{ route('register') }}">Đăng ký ngay</a>
 </div>
+
 
 @endsection

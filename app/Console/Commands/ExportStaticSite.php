@@ -86,13 +86,32 @@ class ExportStaticSite extends Command
             '/forgot-password'  => 'forgot-password',
         ];
 
-        // Trang trải nghiệm giỏ hàng & tài khoản (yêu cầu session auth để render đầy đủ)
+        // Trang trải nghiệm giỏ hàng & tài khoản khách hàng
         $authPages = [
             '/cart'             => 'cart',
             '/checkout'         => 'checkout',
             '/wishlist'         => 'wishlist',
             '/orders'           => 'orders',
             '/profile'          => 'profile',
+        ];
+
+        // Trang quản trị hệ thống Admin (yêu cầu session Admin với đầy đủ tính năng)
+        $adminPages = [
+            '/admin'                 => 'admin',
+            '/admin/orders'          => 'admin/orders',
+            '/admin/products'        => 'admin/products',
+            '/admin/categories'      => 'admin/categories',
+            '/admin/customers'       => 'admin/customers',
+            '/admin/reviews'         => 'admin/reviews',
+            '/admin/returns'         => 'admin/returns',
+            '/admin/reports'         => 'admin/reports',
+            '/admin/roles'           => 'admin/roles',
+            '/admin/users'           => 'admin/users',
+            '/admin/vouchers'        => 'admin/vouchers',
+            '/admin/news'            => 'admin/news',
+            '/admin/goods_receipts'  => 'admin/goods_receipts',
+            '/admin/goods_issues'    => 'admin/goods_issues',
+            '/admin/qc_inspections'  => 'admin/qc_inspections',
         ];
 
         // Thu thập toàn bộ sản phẩm ống kính từ database
@@ -119,30 +138,36 @@ class ExportStaticSite extends Command
             $this->warn("   ! Không thể đọc danh sách News từ database: " . $e->getMessage());
         }
 
-        // Chuẩn bị tài khoản và giỏ hàng mẫu để trang Cart & Checkout render trọn vẹn dữ liệu
-        $demoUser = null;
+        // Chuẩn bị tài khoản Admin và Khách hàng mẫu
+        $adminUser = null;
+        $customerUser = null;
         try {
-            $demoUser = \App\Models\User::first();
-            if ($demoUser) {
+            $adminUser = \App\Models\User::where('role', 'admin')->first() ?: \App\Models\User::first();
+            $customerUser = \App\Models\User::where('role', 'customer')->first() ?: $adminUser;
+
+            if ($customerUser) {
                 $sampleProduct = Product::first();
                 if ($sampleProduct) {
                     \App\Models\Cart::updateOrCreate(
-                        ['user_id' => $demoUser->id, 'product_id' => $sampleProduct->id],
+                        ['user_id' => $customerUser->id, 'product_id' => $sampleProduct->id],
                         ['quantity' => 1, 'is_selected' => true]
                     );
                 }
             }
         } catch (\Throwable $e) {
-            $this->warn("   ! Không thể nạp Demo User: " . $e->getMessage());
+            $this->warn("   ! Không thể nạp Demo Users: " . $e->getMessage());
         }
 
         // Ghép toàn bộ trang để render
         $allPages = [];
         foreach ($publicPages as $routePath => $slug) {
-            $allPages[$routePath] = ['slug' => $slug, 'auth' => false];
+            $allPages[$routePath] = ['slug' => $slug, 'user' => null];
         }
         foreach ($authPages as $routePath => $slug) {
-            $allPages[$routePath] = ['slug' => $slug, 'auth' => true];
+            $allPages[$routePath] = ['slug' => $slug, 'user' => $customerUser];
+        }
+        foreach ($adminPages as $routePath => $slug) {
+            $allPages[$routePath] = ['slug' => $slug, 'user' => $adminUser];
         }
 
         // 4. Render từng trang và ghi tệp Dual-Path
@@ -151,13 +176,13 @@ class ExportStaticSite extends Command
 
         foreach ($allPages as $routePath => $pageConfig) {
             $slug = $pageConfig['slug'];
-            $needsAuth = $pageConfig['auth'];
+            $targetUser = $pageConfig['user'];
             try {
                 $request = Request::create($routePath, 'GET');
                 app()->instance('request', $request);
 
-                if ($needsAuth && $demoUser) {
-                    auth()->login($demoUser);
+                if ($targetUser) {
+                    auth()->login($targetUser);
                 } else {
                     auth()->logout();
                 }
@@ -265,7 +290,7 @@ class ExportStaticSite extends Command
         }
 
         // 3. Đảm bảo các link thư mục trên GitHub Pages có trailing slash để tải index.html đúng
-        $html = preg_replace('/href="(' . preg_quote($targetBase, '/') . '\/(?:gioi-thieu|about|ho-tro|support|contact|san-pham|products|tin-tuc|news|login|register|forgot-password|cart|checkout|wishlist|orders|profile))"/', 'href="$1/"', $html);
+        $html = preg_replace('/href="(' . preg_quote($targetBase, '/') . '\/(?:gioi-thieu|about|ho-tro|support|contact|san-pham|products|tin-tuc|news|login|register|forgot-password|cart|checkout|wishlist|orders|profile|admin(?:\/[a-zA-Z0-9_\-]+)?))"/', 'href="$1/"', $html);
 
         // 4. Nhúng Bộ điều khiển tương tác Client-Side tĩnh trước </body>
         $staticScript = $this->getStaticEnhancementsScript($basePrefix);
@@ -421,7 +446,7 @@ class ExportStaticSite extends Command
         });
     }
 
-    // 5. Xử lý biểu mẫu POST tự nhiên, không gây lỗi 405 trên GitHub Pages
+    // 5. Xử lý biểu mẫu POST tự nhiên & Phân luồng đăng nhập Admin vs Customer
     function initFormNavigation() {
         document.querySelectorAll('form').forEach(form => {
             const method = (form.getAttribute('method') || 'GET').toUpperCase();
@@ -429,22 +454,31 @@ class ExportStaticSite extends Command
 
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
-                const action = form.getAttribute('action') || '';
+                const action = (form.getAttribute('action') || '').toLowerCase();
 
-                if (action.includes('login')) {
-                    // Đăng nhập -> Chuyển về Trang chủ
-                    window.location.href = HOME_URL;
+                if (action.includes('login') || form.querySelector('input[name="email"]')) {
+                    const email = (form.querySelector('input[name="email"]')?.value || '').trim().toLowerCase();
+                    if (email.includes('admin') || email === 'admin@example.com') {
+                        // Quyền Quản trị viên -> Lưu role và chuyển thẳng vào Admin Dashboard
+                        localStorage.setItem('ls_user_role', 'admin');
+                        window.location.href = BASE_URL + '/admin/';
+                    } else {
+                        // Khách hàng thông thường -> Lưu role và chuyển vào Trang Khách hàng
+                        localStorage.setItem('ls_user_role', 'customer');
+                        window.location.href = BASE_URL + '/orders/';
+                    }
                 } else if (action.includes('register')) {
                     // Đăng ký -> Chuyển sang Đăng nhập
-                    window.location.href = BASE_URL + '/login';
+                    window.location.href = BASE_URL + '/login/';
                 } else if (action.includes('checkout') || form.id === 'checkout-form') {
                     // Đặt hàng -> Chuyển sang trang Đơn hàng
-                    window.location.href = BASE_URL + '/orders';
+                    window.location.href = BASE_URL + '/orders/';
                 } else if (action.includes('logout')) {
-                    // Đăng xuất -> Về Trang chủ
+                    // Đăng xuất -> Xóa role và về Trang chủ
+                    localStorage.removeItem('ls_user_role');
                     window.location.href = HOME_URL;
                 } else {
-                    // Các form khác (newsletter footer, v.v.): Phản hồi nút submit
+                    // Các form khác: Phản hồi nút submit
                     const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
                     if (submitBtn) {
                         const prev = submitBtn.textContent;
@@ -456,17 +490,35 @@ class ExportStaticSite extends Command
         });
     }
 
+    // 6. Đồng bộ nút menu "Quản lý Admin" trên Navbar nếu đã đăng nhập Admin
+    function syncAdminNavbar() {
+        const role = localStorage.getItem('ls_user_role');
+        if (role === 'admin') {
+            const navRight = document.querySelector('.navbar div[style*="align-items:center"]:last-child, nav div:last-child');
+            if (navRight && !document.getElementById('ls-admin-nav-btn')) {
+                const adminBtn = document.createElement('a');
+                adminBtn.id = 'ls-admin-nav-btn';
+                adminBtn.href = BASE_URL + '/admin/';
+                adminBtn.style.cssText = 'text-decoration:none;background:#4f46e5;color:white;font-weight:600;padding:6px 14px;border-radius:8px;font-size:0.85rem;display:inline-flex;align-items:center;gap:6px;margin-right:8px;box-shadow:0 4px 12px rgba(79,70,229,0.3);';
+                adminBtn.innerHTML = '<i class="fa-solid fa-shield-halved"></i> 👑 Quản trị Admin';
+                navRight.insertBefore(adminBtn, navRight.firstChild);
+            }
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         syncCartCount();
         initAddToCart();
         initWishlist();
         initLiveFilter();
         initFormNavigation();
+        syncAdminNavbar();
     });
 })();
 </script>
 HTML;
     }
+
 
 
 
