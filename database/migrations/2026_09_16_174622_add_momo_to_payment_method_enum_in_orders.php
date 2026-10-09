@@ -13,11 +13,15 @@ return new class extends Migration
     public function up(): void
     {
         // ALTER TABLE để thêm 'momo' vào ENUM
-        DB::statement("ALTER TABLE `orders` MODIFY `payment_method` ENUM('cod', 'bank_transfer', 'momo') NOT NULL DEFAULT 'cod'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE `orders` MODIFY `payment_method` ENUM('cod', 'bank_transfer', 'momo') NOT NULL DEFAULT 'cod'");
+        }
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE `orders` MODIFY `payment_method` ENUM('cod', 'bank_transfer') NOT NULL DEFAULT 'cod'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE `orders` MODIFY `payment_method` ENUM('cod', 'bank_transfer') NOT NULL DEFAULT 'cod'");
+        }
     }
 };
