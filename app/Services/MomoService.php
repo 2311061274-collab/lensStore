@@ -9,23 +9,31 @@ use Illuminate\Support\Str;
 
 class MomoService
 {
-    private string $endpoint;
-    private string $partnerCode;
-    private string $accessKey;
-    private string $secretKey;
-    private bool   $verifySSL;
-    private string $redirectUrl;
-    private string $ipnUrl;
+    private string $endpoint    = '';
+    private string $partnerCode = '';
+    private string $accessKey   = '';
+    private string $secretKey   = '';
+    private bool   $verifySSL   = false;
+    private string $redirectUrl = '';
+    private string $ipnUrl      = '';
 
     public function __construct()
     {
-        $this->endpoint     = config('services.momo.endpoint');
-        $this->partnerCode  = config('services.momo.partner_code');
-        $this->accessKey    = config('services.momo.access_key');
-        $this->secretKey    = config('services.momo.secret_key');
+        $this->endpoint     = (string) (config('services.momo.endpoint') ?? 'https://test-payment.momo.vn/v2/gateway/api/create');
+        $this->partnerCode  = (string) (config('services.momo.partner_code') ?? '');
+        $this->accessKey    = (string) (config('services.momo.access_key') ?? '');
+        $this->secretKey    = (string) (config('services.momo.secret_key') ?? '');
         $this->verifySSL    = (bool) config('services.momo.verify_ssl', false);
-        $this->redirectUrl  = config('services.momo.redirect_url');
-        $this->ipnUrl       = config('services.momo.ipn_url');
+        $this->redirectUrl  = (string) (config('services.momo.redirect_url') ?? '');
+        $this->ipnUrl       = (string) (config('services.momo.ipn_url') ?? '');
+    }
+
+    /**
+     * Kiểm tra xem cổng thanh toán MoMo đã được cấu hình hay chưa.
+     */
+    public function isConfigured(): bool
+    {
+        return !empty($this->partnerCode) && !empty($this->secretKey);
     }
 
     /**
@@ -33,6 +41,9 @@ class MomoService
      */
     public function createPayment(Order $order): array
     {
+        if (!$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Cổng thanh toán MoMo chưa được cấu hình thông tin kết nối.'];
+        }
         $requestId    = $this->partnerCode . '_' . $order->id . '_' . time();
         $orderId      = $this->partnerCode . '_ORDER_' . $order->id . '_' . time();
         $orderInfo    = 'Thanh toán đơn hàng LensStore #' . $order->id;

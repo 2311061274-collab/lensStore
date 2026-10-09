@@ -7,19 +7,27 @@ use Illuminate\Support\Facades\Log;
 
 class GHNService
 {
-    protected string $baseUrl;
-    protected string $token;
-    protected int    $shopId;
-    protected bool   $verifySsl;
-    protected int    $fromDistrictId;
+    protected string $baseUrl        = '';
+    protected string $token          = '';
+    protected int    $shopId         = 0;
+    protected bool   $verifySsl      = false;
+    protected int    $fromDistrictId = 0;
 
     public function __construct()
     {
-        $this->baseUrl        = config('services.ghn.base_url');
-        $this->token          = config('services.ghn.token');
-        $this->shopId         = (int) config('services.ghn.shop_id');
-        $this->verifySsl      = (bool) config('services.ghn.verify_ssl');
-        $this->fromDistrictId = (int) config('services.ghn.from_district_id');
+        $this->baseUrl        = (string) (config('services.ghn.base_url') ?? 'https://dev-online-gateway.ghn.vn/shiip/public-api');
+        $this->token          = (string) (config('services.ghn.token') ?? '');
+        $this->shopId         = (int) config('services.ghn.shop_id', 0);
+        $this->verifySsl      = (bool) config('services.ghn.verify_ssl', false);
+        $this->fromDistrictId = (int) config('services.ghn.from_district_id', 0);
+    }
+
+    /**
+     * Kiểm tra xem dịch vụ GHN đã được cấu hình Token hay chưa.
+     */
+    public function isConfigured(): bool
+    {
+        return !empty($this->token);
     }
 
     /* ------------------------------------------------------------------ */
@@ -90,6 +98,14 @@ class GHNService
         int    $weight       = 500,
         int    $serviceTypeId = 2
     ): array {
+        if (!$this->isConfigured()) {
+            return [
+                'success' => true,
+                'message' => 'Dịch vụ GHN chưa cấu hình token, áp dụng phí ship cố định.',
+                'data'    => ['total' => 30000],
+            ];
+        }
+
         try {
             $resp = $this->client(withShopId: true)
                          ->post("{$this->baseUrl}/v2/shipping-order/fee", [

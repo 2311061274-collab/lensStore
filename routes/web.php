@@ -206,3 +206,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
     Route::get('chat/messages/{userId}', [AdminChatController::class, 'getMessages'])->name('chat.messages');
     Route::post('chat/send', [AdminChatController::class, 'send'])->name('chat.send');
 });
+
+// Hỗ trợ truy cập URL có tiền tố /lensStore (tương thích GitHub Pages base path & Apache Alias)
+Route::any('/lensStore/{path?}', function (\Illuminate\Http\Request $request, $path = null) {
+    $target = '/' . ltrim($path ?? '', '/');
+    $query = $request->getQueryString();
+    return redirect($target . ($query ? '?' . $query : ''));
+})->where('path', '.*');
