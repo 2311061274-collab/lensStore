@@ -267,47 +267,207 @@ class ExportStaticSite extends Command
         // 3. Đảm bảo các link thư mục trên GitHub Pages có trailing slash để tải index.html đúng
         $html = preg_replace('/href="(' . preg_quote($targetBase, '/') . '\/(?:gioi-thieu|about|ho-tro|support|contact|san-pham|products|tin-tuc|news|login|register|forgot-password|cart|checkout|wishlist|orders|profile))"/', 'href="$1/"', $html);
 
-        // 4. Nhúng Demo Mode Toast Script trước </body>
-        $demoScript = $this->getDemoModeScript();
-        $html = str_replace('</body>', $demoScript . '</body>', $html);
+        // 4. Nhúng Bộ điều khiển tương tác Client-Side tĩnh trước </body>
+        $staticScript = $this->getStaticEnhancementsScript($basePrefix);
+        $html = str_replace('</body>', $staticScript . '</body>', $html);
 
         return $html;
     }
 
     /**
-     * Script hỗ trợ trải nghiệm tương tác trên môi trường tĩnh GitHub Pages.
+     * Script hỗ trợ trải nghiệm tương tác tự nhiên, mượt mà trên môi trường tĩnh GitHub Pages.
      */
-    protected function getDemoModeScript(): string
+    protected function getStaticEnhancementsScript(string $basePrefix): string
     {
-        return <<<'HTML'
-<!-- LensStore GitHub Pages Demo Mode Helper -->
-<div id="ls-demo-toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e1b4b;color:white;padding:14px 24px;border-radius:12px;box-shadow:0 20px 40px rgba(0,0,0,0.3);z-index:99999;font-family:'Inter',sans-serif;font-size:0.9rem;border:1px solid #4f46e5;display:none;align-items:center;gap:12px;max-width:90vw;">
-    <i class="fa-solid fa-circle-info" style="color:#f59e0b;font-size:1.2rem;"></i>
-    <span id="ls-demo-msg">Website đang chạy ở chế độ <strong>Showcase tĩnh trên GitHub Pages</strong> (Dữ liệu nạp từ Aiven Cloud MySQL).</span>
-</div>
+        $targetBase = !empty($basePrefix) ? $basePrefix : '';
+        $homeUrl = !empty($targetBase) ? $targetBase . '/' : '/';
+
+        return <<<HTML
+<!-- LensStore Client-Side Static Interactive Engine -->
 <script>
 (function() {
-    function showLsToast(msg) {
-        var toast = document.getElementById('ls-demo-toast');
-        var msgEl = document.getElementById('ls-demo-msg');
-        if (msg) msgEl.innerText = msg;
-        toast.style.display = 'flex';
-        clearTimeout(window.__lsToastTimer);
-        window.__lsToastTimer = setTimeout(function() { toast.style.display = 'none'; }, 4000);
+    const BASE_URL = '{$targetBase}';
+    const HOME_URL = '{$homeUrl}';
+
+    // 1. Đồng bộ số lượng giỏ hàng trên Navbar từ localStorage
+    function syncCartCount() {
+        const count = parseInt(localStorage.getItem('ls_cart_count') || '1', 10);
+        document.querySelectorAll('#cart-count, .sf-cart-dropdown span').forEach(el => {
+            if (el) el.textContent = count;
+        });
     }
-    window.showLsDemoToast = showLsToast;
+
+    // 2. Tương tác Thêm vào giỏ hàng (.add-to-cart-btn)
+    function initAddToCart() {
+        document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                let currentCount = parseInt(localStorage.getItem('ls_cart_count') || '1', 10);
+                currentCount += 1;
+                localStorage.setItem('ls_cart_count', currentCount);
+                syncCartCount();
+
+                const originalHtml = this.innerHTML;
+                this.innerHTML = '<i class="fa-solid fa-check"></i> Đã thêm';
+                this.style.background = '#10b981';
+                this.style.color = '#ffffff';
+
+                setTimeout(() => {
+                    this.innerHTML = originalHtml;
+                    this.style.background = '';
+                    this.style.color = '';
+                }, 1500);
+            }, true);
+        });
+    }
+
+    // 3. Tương tác Nút Yêu thích (.wishlist-btn)
+    function initWishlist() {
+        document.querySelectorAll('.wishlist-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const icon = this.querySelector('i');
+                if (icon) {
+                    if (icon.classList.contains('fa-solid')) {
+                        icon.classList.remove('fa-solid');
+                        icon.classList.add('fa-regular');
+                        icon.style.color = '';
+                    } else {
+                        icon.classList.remove('fa-regular');
+                        icon.classList.add('fa-solid');
+                        icon.style.color = '#ef4444';
+                    }
+                }
+            });
+        });
+    }
+
+    // 4. Tìm kiếm & Lọc sản phẩm trực tiếp (Live Product Filter) trên trang Sản phẩm
+    function initLiveFilter() {
+        const filterForm = document.querySelector('.filter-card');
+        const productGrid = document.querySelector('.product-grid');
+        if (!productGrid) return;
+
+        const cards = Array.from(productGrid.querySelectorAll('.product-card'));
+        const searchInput = document.querySelector('input[name="search"]');
+        const categorySelect = document.querySelector('select[name="category"]');
+        const brandSelect = document.querySelector('select[name="brand"]');
+        const sortSelect = document.querySelector('select[name="sort"]');
+        const countEl = document.querySelector('.products-count');
+
+        function applyFilter() {
+            const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+            const brandVal = (brandSelect ? brandSelect.value : '').trim().toUpperCase();
+            const catVal = (categorySelect ? categorySelect.value : '').trim();
+
+            let visibleCount = 0;
+            cards.forEach(card => {
+                const name = (card.querySelector('.product-name')?.textContent || '').toLowerCase();
+                const brand = (card.querySelector('.badge-brand')?.textContent || '').toUpperCase();
+                const cat = (card.querySelector('.product-cat')?.textContent || '').toLowerCase();
+
+                let match = true;
+                if (query && !name.includes(query) && !brand.toLowerCase().includes(query)) match = false;
+                if (brandVal && brand !== brandVal) match = false;
+                if (catVal && !cat.includes(catVal.toLowerCase())) match = false;
+
+                if (match) {
+                    card.style.display = '';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            if (countEl) countEl.textContent = visibleCount + ' sản phẩm';
+        }
+
+        // Đọc tham số URL ban đầu nếu có (vd ?search=canon)
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('search') && searchInput) {
+            searchInput.value = params.get('search');
+            applyFilter();
+        }
+        if (params.get('brand') && brandSelect) {
+            brandSelect.value = params.get('brand');
+            applyFilter();
+        }
+
+        // Sự kiện lọc
+        if (filterForm) {
+            filterForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                applyFilter();
+            });
+        }
+        if (searchInput) searchInput.addEventListener('input', applyFilter);
+        if (categorySelect) categorySelect.addEventListener('change', applyFilter);
+        if (brandSelect) brandSelect.addEventListener('change', applyFilter);
+        if (sortSelect) sortSelect.addEventListener('change', applyFilter);
+
+        // Click các chip thương hiệu CANON, SONY, NIKON...
+        document.querySelectorAll('.brand-item').forEach(item => {
+            item.style.cursor = 'pointer';
+            item.addEventListener('click', function() {
+                const brand = this.textContent.trim().toUpperCase();
+                if (brandSelect) {
+                    brandSelect.value = (brandSelect.value === brand) ? '' : brand;
+                    applyFilter();
+                }
+            });
+        });
+    }
+
+    // 5. Xử lý biểu mẫu POST tự nhiên, không gây lỗi 405 trên GitHub Pages
+    function initFormNavigation() {
+        document.querySelectorAll('form').forEach(form => {
+            const method = (form.getAttribute('method') || 'GET').toUpperCase();
+            if (method !== 'POST') return; // Bỏ qua form GET
+
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const action = form.getAttribute('action') || '';
+
+                if (action.includes('login')) {
+                    // Đăng nhập -> Chuyển về Trang chủ
+                    window.location.href = HOME_URL;
+                } else if (action.includes('register')) {
+                    // Đăng ký -> Chuyển sang Đăng nhập
+                    window.location.href = BASE_URL + '/login';
+                } else if (action.includes('checkout') || form.id === 'checkout-form') {
+                    // Đặt hàng -> Chuyển sang trang Đơn hàng
+                    window.location.href = BASE_URL + '/orders';
+                } else if (action.includes('logout')) {
+                    // Đăng xuất -> Về Trang chủ
+                    window.location.href = HOME_URL;
+                } else {
+                    // Các form khác (newsletter footer, v.v.): Phản hồi nút submit
+                    const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+                    if (submitBtn) {
+                        const prev = submitBtn.textContent;
+                        submitBtn.textContent = '✓ Hoàn tất';
+                        setTimeout(() => { submitBtn.textContent = prev; }, 2000);
+                    }
+                }
+            });
+        });
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Xử lý nộp form POST an toàn trên môi trường tĩnh GitHub Pages (tránh lỗi 405 Method Not Allowed)
-        document.addEventListener('submit', function(e) {
-            e.preventDefault();
-            showLsToast('✨ [Demo GitHub Pages] Thao tác gửi biểu mẫu mô phỏng đã hoàn tất thành công!');
-        });
+        syncCartCount();
+        initAddToCart();
+        initWishlist();
+        initLiveFilter();
+        initFormNavigation();
     });
 })();
 </script>
 HTML;
     }
+
 
 
     /**
