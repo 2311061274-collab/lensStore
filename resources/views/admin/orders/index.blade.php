@@ -78,6 +78,7 @@
                 <tr>
                     <th>ID</th>
                     <th>Khách</th>
+                    <th>Sản phẩm</th>
                     <th>Tổng</th>
                     <th>Thanh toán</th>
                     <th>Trạng thái</th>
@@ -89,11 +90,12 @@
             <tbody>
             @forelse($orders as $order)
                 <tr>
-                    <td><strong>#{{ $order->id }}</strong></td>
+                    <td><strong>#{{ $order->order_code ?? $order->id }}</strong></td>
                     <td>
                         {{ $order->recipient_name }}<br>
                         <span class="muted">{{ $order->recipient_phone }}</span>
                     </td>
+                    <td>{{ $order->items->sum('quantity') }}</td>
                     <td><strong>{{ number_format($order->total, 0, ',', '.') }} ₫</strong></td>
                     <td>
                         <div><span class="badge" style="background:var(--surface-soft);color:var(--ink-soft)">{{ strtoupper($order->payment_method) }}</span></div>
@@ -115,7 +117,7 @@
                     <td><a class="btn btn-sm btn-outline" href="{{ route('admin.orders.show', $order) }}">Chi tiết</a></td>
                 </tr>
             @empty
-                <tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Chưa có đơn hàng.</div></td></tr>
+                <tr><td colspan="9"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Chưa có đơn hàng.</div></td></tr>
             @endforelse
             </tbody>
         </table>

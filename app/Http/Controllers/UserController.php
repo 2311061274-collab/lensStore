@@ -41,7 +41,7 @@ class UserController extends Controller
             'name'     => $request->name,
             'email'    => $request->email,
             'password' => Hash::make($request->password),
-            'role'     => $request->role, // keep legacy column in sync
+            'role'     => match($request->role) { 'admin' => 'admin', 'Khách hàng' => 'customer', 'customer' => 'customer', default => 'staff' }, // keep legacy column in sync
         ]);
 
         $user->assignRole($request->role);
@@ -72,11 +72,11 @@ class UserController extends Controller
         $data = [
             'name'  => $request->name,
             'email' => $request->email,
-            'role'  => $request->role, // legacy column
+            'role'  => match($request->role) { 'admin' => 'admin', 'Khách hàng' => 'customer', 'customer' => 'customer', default => 'staff' }, // legacy column
         ];
 
         if ($request->filled('password')) {
-            $request->validate(['password' => 'string|min:8|confirmed']);
+            $request->validate(['password' => 'string|confirmed']);
             $data['password'] = Hash::make($request->password);
         }
 
@@ -95,7 +95,8 @@ class UserController extends Controller
     {
         $request->validate(['role' => 'required|exists:roles,name']);
         $user->syncRoles([$request->role]);
-        $user->update(['role' => $request->role]); // keep legacy column in sync
+        $legacyRole = match($request->role) { 'admin' => 'admin', 'Khách hàng' => 'customer', 'customer' => 'customer', default => 'staff' };
+        $user->update(['role' => $legacyRole]); // keep legacy column in sync
         return redirect()->back()->with('success', "Đã cập nhật vai trò của {$user->name} thành công.");
     }
 

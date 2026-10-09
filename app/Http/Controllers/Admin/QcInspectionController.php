@@ -15,7 +15,7 @@ class QcInspectionController extends Controller
     public function index()
     {
         $inspections = QcInspection::with('returnRequest', 'product', 'user')->latest()->paginate(15);
-        $pendingReturns = ReturnRequest::with('order.items.product')->where('status', 'pending')->get();
+        $pendingReturns = ReturnRequest::with('order.items.product')->where('status', 'approved')->get();
         return view('admin.qc_inspections.index', compact('inspections', 'pendingReturns'));
     }
 

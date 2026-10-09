@@ -126,7 +126,7 @@
                         </td>
                         <td>
                             <a href="{{ route('admin.orders.show', $req->order_id) }}" style="color:var(--primary);font-weight:700;display:inline-flex;align-items:center;gap:4px;">
-                                <i class="fa-solid fa-receipt"></i> #{{ str_pad($req->order_id, 6, '0', STR_PAD_LEFT) }}
+                                <i class="fa-solid fa-receipt"></i> #{{ $req->order->order_code ?? str_pad($req->order_id, 6, '0', STR_PAD_LEFT) }}
                             </a>
                         </td>
                         <td style="text-align:right; font-weight:700; color:var(--danger);">
@@ -171,14 +171,14 @@
                                 <form action="{{ route('admin.returns.update-status', $req->id) }}" method="POST" style="margin:0;">
                                     @csrf @method('PATCH')
                                     <input type="hidden" name="status" value="approved">
-                                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Chấp nhận hoàn tiền cho đơn hàng #{{ str_pad($req->order_id, 6, '0', STR_PAD_LEFT) }}?');">
+                                    <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Chấp nhận hoàn tiền cho đơn hàng #{{ $req->order->order_code ?? str_pad($req->order_id, 6, '0', STR_PAD_LEFT) }}?');">
                                         <i class="fa-solid fa-check"></i> Duyệt
                                     </button>
                                 </form>
                                 <form action="{{ route('admin.returns.update-status', $req->id) }}" method="POST" style="margin:0;">
                                     @csrf @method('PATCH')
                                     <input type="hidden" name="status" value="rejected">
-                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Từ chối yêu cầu đổi trả cho đơn #{{ str_pad($req->order_id, 6, '0', STR_PAD_LEFT) }}?');">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Từ chối yêu cầu đổi trả cho đơn #{{ $req->order->order_code ?? str_pad($req->order_id, 6, '0', STR_PAD_LEFT) }}?');">
                                         <i class="fa-solid fa-xmark"></i> Từ chối
                                     </button>
                                 </form>

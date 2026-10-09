@@ -51,7 +51,7 @@
         <div class="order-card">
             <div class="order-card-header">
                 <div>
-                    <div class="order-id">#{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</div>
+                    <div class="order-id">#{{ $order->order_code ?? str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</div>
                     <div class="order-date">{{ $order->created_at->format('d/m/Y H:i') }}</div>
                 </div>
                 @if($order->ghn_order_code)

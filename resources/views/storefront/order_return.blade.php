@@ -16,7 +16,7 @@
 <div class="return-container">
     <div class="card">
         <h2 class="card-title">Yêu cầu Trả hàng / Hoàn tiền</h2>
-        <p style="color:#64748b; margin-bottom: 1.5rem;">Đơn hàng <strong>#{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</strong></p>
+        <p style="color:#64748b; margin-bottom: 1.5rem;">Đơn hàng <strong>#{{ $order->order_code ?? str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</strong></p>
 
         @if(session('error'))
             <div style="background:#fee2e2;color:#991b1b;padding:1rem;border-radius:8px;margin-bottom:1rem;">{{ session('error') }}</div>

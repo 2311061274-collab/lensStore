@@ -286,7 +286,10 @@
         </div>
 
         <div class="cta-buttons">
-            <button class="btn-buy add-to-cart-btn" data-id="{{ $product->id }}">
+            <button class="btn-buy buy-now-btn" data-id="{{ $product->id }}" style="background: linear-gradient(135deg, #f97316, #ea580c); margin-bottom: -4px;">
+                <i class="fa-solid fa-bolt"></i> Mua ngay
+            </button>
+            <button class="btn-buy add-to-cart-btn" data-id="{{ $product->id }}" style="background: var(--surface); color: var(--primary); border: 2px solid var(--primary);">
                 <i class="fa-solid fa-cart-plus"></i> Thêm vào giỏ hàng
             </button>
             @php
@@ -454,6 +457,52 @@
             .catch(error => {
                 console.error('Error:', error);
                 alert('Có lỗi xảy ra, vui lòng thử lại.');
+            });
+        });
+    });
+
+    document.querySelectorAll('.buy-now-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (!isLoggedIn) {
+                alert('Vui lòng đăng nhập hoặc đăng ký để mua hàng.');
+                window.location.href = "{{ route('login') }}";
+                return;
+            }
+
+            const productId = this.getAttribute('data-id');
+            const quantity = 1;
+            
+            this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+            this.style.pointerEvents = 'none';
+
+            fetch("{{ route('cart.buy-now') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    product_id: productId,
+                    quantity: quantity
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success && data.redirect) {
+                    window.location.href = data.redirect;
+                } else {
+                    alert('Có lỗi xảy ra, vui lòng thử lại.');
+                    this.innerHTML = '<i class="fa-solid fa-bolt"></i> Mua ngay';
+                    this.style.pointerEvents = 'auto';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Có lỗi xảy ra, vui lòng thử lại.');
+                this.innerHTML = '<i class="fa-solid fa-bolt"></i> Mua ngay';
+                this.style.pointerEvents = 'auto';
             });
         });
     });

@@ -119,13 +119,17 @@
 
                 <h3 class="checkout-card-title"><i class="fa-solid fa-location-dot"></i> Thông tin nhận hàng</h3>
 
-                @if(Auth::check() && Auth::user()->addresses->count() > 0)
+                @if(Auth::check())
                     <div style="margin-bottom: 1.5rem; background: #f8fafc; padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
                         <label class="form-label" style="margin-bottom: 1rem;"><i class="fa-solid fa-address-book" style="color:var(--primary); margin-right:5px;"></i> Chọn từ Sổ địa chỉ</label>
                         <div class="grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                            @php
+                                $defaultAddrId = optional(Auth::user()->addresses->firstWhere('is_default', true))->id;
+                                $selectedAddrId = old('saved_address_id', $defaultAddrId);
+                            @endphp
                             @foreach(Auth::user()->addresses as $addr)
                                 <label class="saved-address-option" style="display: block; cursor: pointer; padding: 1rem; border: 1.5px solid var(--border); border-radius: 8px; background: white; position: relative;">
-                                    <input type="radio" name="saved_address_id" value="{{ $addr->id }}" onchange="fillAddress(this)" style="position: absolute; top: 1rem; right: 1rem; accent-color: var(--primary);" {{ $addr->is_default ? 'checked' : '' }}>
+                                    <input type="radio" name="saved_address_id" value="{{ $addr->id }}" onchange="fillAddress(this)" style="position: absolute; top: 1rem; right: 1rem; accent-color: var(--primary);" {{ $selectedAddrId == $addr->id ? 'checked' : '' }}>
                                     <div style="font-weight: 600; margin-bottom: 4px; padding-right: 20px;">{{ $addr->name }}</div>
                                     <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">{{ $addr->phone }}</div>
                                     <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">{{ $addr->address }}<br>{{ $addr->district }}, {{ $addr->province }}</div>
@@ -134,12 +138,11 @@
                                     @endif
                                 </label>
                             @endforeach
-                            <label class="saved-address-option" style="display: block; cursor: pointer; padding: 1rem; border: 1.5px solid var(--border); border-radius: 8px; background: white; position: relative;">
-                                <input type="radio" name="saved_address_id" value="new" onchange="clearAddress()" style="position: absolute; top: 1rem; right: 1rem; accent-color: var(--primary);">
+                            <div class="saved-address-option" onclick="showAddressModal()" style="display: block; cursor: pointer; padding: 1rem; border: 1.5px dashed var(--primary); border-radius: 8px; background: #eff6ff; position: relative; transition: all 0.2s;">
                                 <div style="font-weight: 600; display: flex; height: 100%; align-items: center; justify-content: center; gap: 8px; color: var(--primary);">
                                     <i class="fa-solid fa-plus"></i> Nhập địa chỉ mới
                                 </div>
-                            </label>
+                            </div>
                         </div>
                     </div>
                 @endif
@@ -261,6 +264,57 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Modal Thêm Địa chỉ -->
+<div id="address-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 16px; width: 100%; max-width: 500px; padding: 2rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <h3 id="address-modal-title" style="margin-bottom: 1.5rem;">Thêm địa chỉ mới</h3>
+        <form id="address-form" method="POST" action="{{ route('profile.addresses.store') }}">
+            @csrf
+            <input type="hidden" name="redirect_to" value="{{ url()->current() }}">
+            
+            <div class="form-group">
+                <label>Họ tên người nhận <span style="color:#ef4444">*</span></label>
+                <input type="text" name="name" id="addr-name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Số điện thoại <span style="color:#ef4444">*</span></label>
+                <input type="text" name="phone" id="addr-phone" class="form-control" required>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Tỉnh / Thành phố <span style="color:#ef4444">*</span></label>
+                    <select name="province" id="addr-province" class="form-control" required onchange="loadModalWards(this.options[this.selectedIndex])">
+                        <option value="">Chọn Tỉnh/Thành</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Phường / Xã <span style="color:#ef4444">*</span></label>
+                    <select name="district" id="addr-district" class="form-control" required>
+                        <option value="">Chọn Phường/Xã</option>
+                    </select>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">* Không còn cấp Quận/Huyện</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Địa chỉ cụ thể (Số nhà, đường, phường/xã) <span style="color:#ef4444">*</span></label>
+                <textarea name="address" id="addr-address" class="form-control" rows="2" required></textarea>
+            </div>
+            
+            <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" name="is_default" id="addr-default" value="1" style="width: 16px; height: 16px;">
+                <label for="addr-default" style="margin-bottom: 0; font-weight: 500;">Đặt làm địa chỉ mặc định</label>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                <button type="button" class="btn btn-secondary" style="flex: 1; padding: 1rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; background: #f1f5f9; color: var(--text-main);" onclick="closeAddressModal()">Hủy</button>
+                <button type="submit" class="btn btn-primary" style="flex: 1; padding: 1rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; background: var(--primary); color: white;">Lưu địa chỉ</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -696,11 +750,59 @@ function clearAddress() {
     document.getElementById('district_name_input').value = '';
     
     document.getElementById('shipping_fee_input').value = '0';
-    document.getElementById('shipping_fee_display').textContent = 'Chưa tính';
+    setShippingDisplay('<span class="fee-badge hint"><i class="fa-solid fa-truck"></i> Chọn địa chỉ để tính phí</span>', 0);
+    enableOrder(false);
     
     updateTotal();
 }
 
+function uncheckAddresses() {
+    document.querySelectorAll('input[name="saved_address_id"]').forEach(el => el.checked = false);
+}
+
+// Modal functions
+function showAddressModal() {
+    document.getElementById('address-form').reset();
+    document.getElementById('addr-district').innerHTML = '<option value="">Chọn Phường/Xã</option>';
+    document.getElementById('address-modal').style.display = 'flex';
+    
+    // Populate modal province select
+    const select = document.getElementById('addr-province');
+    select.innerHTML = '<option value="">Chọn Tỉnh/Thành</option>';
+    allProvinces.forEach(p => {
+        const option = document.createElement('option');
+        option.value = p.ProvinceName;
+        option.dataset.id = p.ProvinceID;
+        option.textContent = p.ProvinceName;
+        select.appendChild(option);
+    });
+}
+
+function closeAddressModal() {
+    document.getElementById('address-modal').style.display = 'none';
+}
+
+async function loadModalWards(option) {
+    let provinceId = option?.dataset?.id;
+    const distSelect = document.getElementById('addr-district');
+    distSelect.innerHTML = '<option value="">Đang tải Phường/Xã...</option>';
+    
+    if(!provinceId) return;
+
+    try {
+        const res = await fetch(ROUTES.wardsByProvince + "?province_id=" + provinceId);
+        const data = await res.json();
+        distSelect.innerHTML = '<option value="">Chọn Phường/Xã</option>';
+        if(data.data) {
+            data.data.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.WardName;
+                opt.textContent = d.WardName;
+                distSelect.appendChild(opt);
+            });
+        }
+    } catch(e) {}
+}
 
 </script>
 @endsection

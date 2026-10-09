@@ -91,6 +91,7 @@ class OrderController extends Controller
             // Tạo đơn hàng
             $order = Order::create([
                 'user_id'         => Auth::id(),
+                'order_code'      => 'TEMP_' . \Illuminate\Support\Str::random(8),
                 'recipient_name'  => $request->recipient_name,
                 'recipient_phone' => $request->recipient_phone,
                 'province_id'     => $request->province_id,
@@ -108,6 +109,11 @@ class OrderController extends Controller
                 'voucher_code'    => $voucherCode,
                 'discount_amount' => $discountAmount,
                 'status'          => 'pending',
+            ]);
+
+            // Sinh mã đơn hàng chuyên nghiệp
+            $order->update([
+                'order_code' => 'LS' . now()->format('ymd') . str_pad($order->id, 4, '0', STR_PAD_LEFT)
             ]);
 
             // Tạo order items
