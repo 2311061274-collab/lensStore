@@ -84,7 +84,9 @@ jobs:
           npm run build
 
       - name: Run Database Migrations
-        run: php artisan migrate --force
+        run: |
+          php artisan migrate --force
+          php artisan db:seed --class=LensDataSeeder --force || true
 
       - name: Export Static Site for GitHub Pages
         run: |

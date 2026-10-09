@@ -70,25 +70,37 @@ class ExportStaticSite extends Command
         $this->line("   - Đã tạo .nojekyll");
 
         // 3. Danh sách các trang tĩnh cần render (Key: Route path, Value: slug)
-        $pages = [
-            '/'           => '',
-            '/san-pham'   => 'san-pham',
-            '/products'   => 'products',
-            '/gioi-thieu' => 'gioi-thieu',
-            '/about'      => 'about',
-            '/ho-tro'     => 'ho-tro',
-            '/support'    => 'support',
-            '/contact'    => 'contact',
-            '/tin-tuc'    => 'tin-tuc',
-            '/news'       => 'news',
+        $publicPages = [
+            '/'                 => '',
+            '/san-pham'         => 'san-pham',
+            '/products'         => 'products',
+            '/gioi-thieu'       => 'gioi-thieu',
+            '/about'            => 'about',
+            '/ho-tro'           => 'ho-tro',
+            '/support'          => 'support',
+            '/contact'          => 'contact',
+            '/tin-tuc'          => 'tin-tuc',
+            '/news'             => 'news',
+            '/login'            => 'login',
+            '/register'         => 'register',
+            '/forgot-password'  => 'forgot-password',
+        ];
+
+        // Trang trải nghiệm giỏ hàng & tài khoản (yêu cầu session auth để render đầy đủ)
+        $authPages = [
+            '/cart'             => 'cart',
+            '/checkout'         => 'checkout',
+            '/wishlist'         => 'wishlist',
+            '/orders'           => 'orders',
+            '/profile'          => 'profile',
         ];
 
         // Thu thập toàn bộ sản phẩm ống kính từ database
         try {
             $products = Product::all();
             foreach ($products as $prod) {
-                $pages['/product/' . $prod->id] = 'product/' . $prod->id;
-                $pages['/san-pham/' . $prod->id] = 'san-pham/' . $prod->id;
+                $publicPages['/product/' . $prod->id] = 'product/' . $prod->id;
+                $publicPages['/san-pham/' . $prod->id] = 'san-pham/' . $prod->id;
             }
             $this->info("   - Đã thu thập " . $products->count() . " sản phẩm ống kính.");
         } catch (\Throwable $e) {
@@ -99,21 +111,57 @@ class ExportStaticSite extends Command
         try {
             $newsArticles = News::all();
             foreach ($newsArticles as $article) {
-                $pages['/tin-tuc/' . $article->id] = 'tin-tuc/' . $article->id;
-                $pages['/news/' . $article->id] = 'news/' . $article->id;
+                $publicPages['/tin-tuc/' . $article->id] = 'tin-tuc/' . $article->id;
+                $publicPages['/news/' . $article->id] = 'news/' . $article->id;
             }
             $this->info("   - Đã thu thập " . $newsArticles->count() . " bài viết tin tức.");
         } catch (\Throwable $e) {
             $this->warn("   ! Không thể đọc danh sách News từ database: " . $e->getMessage());
         }
 
+        // Chuẩn bị tài khoản và giỏ hàng mẫu để trang Cart & Checkout render trọn vẹn dữ liệu
+        $demoUser = null;
+        try {
+            $demoUser = \App\Models\User::first();
+            if ($demoUser) {
+                $sampleProduct = Product::first();
+                if ($sampleProduct) {
+                    \App\Models\Cart::updateOrCreate(
+                        ['user_id' => $demoUser->id, 'product_id' => $sampleProduct->id],
+                        ['quantity' => 1, 'is_selected' => true]
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->warn("   ! Không thể nạp Demo User: " . $e->getMessage());
+        }
+
+        // Ghép toàn bộ trang để render
+        $allPages = [];
+        foreach ($publicPages as $routePath => $slug) {
+            $allPages[$routePath] = ['slug' => $slug, 'auth' => false];
+        }
+        foreach ($authPages as $routePath => $slug) {
+            $allPages[$routePath] = ['slug' => $slug, 'auth' => true];
+        }
+
         // 4. Render từng trang và ghi tệp Dual-Path
-        $this->info("📄 Đang render và chuẩn hóa " . count($pages) . " trang cho GitHub Pages...");
+        $this->info("📄 Đang render và chuẩn hóa " . count($allPages) . " trang cho GitHub Pages...");
         $kernel = app()->make(\Illuminate\Contracts\Http\Kernel::class);
 
-        foreach ($pages as $routePath => $slug) {
+        foreach ($allPages as $routePath => $pageConfig) {
+            $slug = $pageConfig['slug'];
+            $needsAuth = $pageConfig['auth'];
             try {
                 $request = Request::create($routePath, 'GET');
+                app()->instance('request', $request);
+
+                if ($needsAuth && $demoUser) {
+                    auth()->login($demoUser);
+                } else {
+                    auth()->logout();
+                }
+
                 $response = $kernel->handle($request);
                 $html = $response->getContent();
                 $kernel->terminate($request, $response);
@@ -148,6 +196,11 @@ class ExportStaticSite extends Command
                 $this->error("   ✗ Lỗi khi render {$routePath}: " . $e->getMessage());
             }
         }
+
+        // Reset auth state sau khi render
+        try {
+            auth()->logout();
+        } catch (\Throwable $e) {}
 
         // 5. Tạo 404.html chuyên nghiệp cho GitHub Pages
         $homeUrl = !empty($basePrefix) ? $basePrefix . '/' : '/';
@@ -198,7 +251,7 @@ class ExportStaticSite extends Command
             $internalRoutes = [
                 'san-pham', 'products', 'gioi-thieu', 'about',
                 'ho-tro', 'support', 'contact', 'tin-tuc', 'news',
-                'product', 'cart', 'checkout', 'login', 'register', 'orders', 'wishlist', 'profile', 'admin'
+                'product', 'cart', 'checkout', 'login', 'register', 'forgot-password', 'orders', 'wishlist', 'profile', 'admin'
             ];
 
             foreach ($internalRoutes as $r) {
@@ -212,7 +265,7 @@ class ExportStaticSite extends Command
         }
 
         // 3. Đảm bảo các link thư mục trên GitHub Pages có trailing slash để tải index.html đúng
-        $html = preg_replace('/href="(' . preg_quote($targetBase, '/') . '\/(?:gioi-thieu|about|ho-tro|support|contact|san-pham|products|tin-tuc|news))"/', 'href="$1/"', $html);
+        $html = preg_replace('/href="(' . preg_quote($targetBase, '/') . '\/(?:gioi-thieu|about|ho-tro|support|contact|san-pham|products|tin-tuc|news|login|register|forgot-password|cart|checkout|wishlist|orders|profile))"/', 'href="$1/"', $html);
 
         // 4. Nhúng Demo Mode Toast Script trước </body>
         $demoScript = $this->getDemoModeScript();
@@ -245,22 +298,17 @@ class ExportStaticSite extends Command
     window.showLsDemoToast = showLsToast;
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Bắt các nút chức năng server động trên GitHub Pages
-        document.querySelectorAll('a[href*="/login"], a[href*="/register"], a[href*="/cart"], a[href*="/checkout"]').forEach(function(el) {
-            el.addEventListener('click', function(e) {
-                // Nếu trang con không tồn tại trong static build
-                var href = el.getAttribute('href');
-                if (href.indexOf('login') !== -1 || href.indexOf('register') !== -1 || href.indexOf('checkout') !== -1) {
-                    e.preventDefault();
-                    showLsToast('💡 Chức năng xác thực & thanh toán yêu cầu máy chủ PHP động. Bạn đang duyệt bản Demo tĩnh trên GitHub Pages!');
-                }
-            });
+        // Xử lý nộp form POST an toàn trên môi trường tĩnh GitHub Pages (tránh lỗi 405 Method Not Allowed)
+        document.addEventListener('submit', function(e) {
+            e.preventDefault();
+            showLsToast('✨ [Demo GitHub Pages] Thao tác gửi biểu mẫu mô phỏng đã hoàn tất thành công!');
         });
     });
 })();
 </script>
 HTML;
     }
+
 
     /**
      * Tạo trang 404.html thân thiện chuẩn SEO cho GitHub Pages.
