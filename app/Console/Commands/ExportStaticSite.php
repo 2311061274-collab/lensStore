@@ -670,29 +670,12 @@ class ExportStaticSite extends Command
         });
     }
 
-    // 6. Đồng bộ nút menu "Quản lý Admin" trên Navbar nếu đã đăng nhập Admin
-    function syncAdminNavbar() {
-        const role = localStorage.getItem('ls_user_role');
-        if (role === 'admin') {
-            const navRight = document.querySelector('.navbar div[style*="align-items:center"]:last-child, nav div:last-child');
-            if (navRight && !document.getElementById('ls-admin-nav-btn')) {
-                const adminBtn = document.createElement('a');
-                adminBtn.id = 'ls-admin-nav-btn';
-                adminBtn.href = BASE_URL + '/admin/';
-                adminBtn.style.cssText = 'text-decoration:none;background:#4f46e5;color:white;font-weight:600;padding:6px 14px;border-radius:8px;font-size:0.85rem;display:inline-flex;align-items:center;gap:6px;margin-right:8px;box-shadow:0 4px 12px rgba(79,70,229,0.3);';
-                adminBtn.innerHTML = '<i class="fa-solid fa-shield-halved"></i> 👑 Quản trị Admin';
-                navRight.insertBefore(adminBtn, navRight.firstChild);
-            }
-        }
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
         syncCartCount();
         initAddToCart();
         initWishlist();
         initLiveFilter();
         initFormNavigation();
-        syncAdminNavbar();
     });
 })();
 </script>

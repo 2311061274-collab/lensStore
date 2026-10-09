@@ -163,38 +163,12 @@
 <body>
 
 <!-- ===== NAVBAR ===== -->
-<nav class="navbar">
-    <a href="/" class="navbar-brand">
-        <div class="icon"><i class="fa-solid fa-camera-retro"></i></div>
-        LensStore
-    </a>
-    <div class="nav-right">
-        <a href="/"><i class="fa-solid fa-house"></i> Trang chủ</a>
-        @auth
-            @if(in_array(auth()->user()->role, ['admin','staff']))
-                <a href="{{ route('admin.dashboard') }}"><i class="fa-solid fa-gauge"></i> Quản lý</a>
-            @endif
-            <a href="{{ route('wishlist.index') }}"><i class="fa-solid fa-heart"></i> Yêu thích</a>
-            <a href="{{ route('cart.index') }}" style="position: relative;">
-                <i class="fa-solid fa-cart-shopping"></i> Giỏ hàng
-                <span id="cart-count" style="position: absolute; top: -5px; right: -10px; background: #ef4444; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: 700;">{{ \App\Models\Cart::where('user_id', auth()->id())->sum('quantity') }}</span>
-            </a>
-            <span style="color: var(--text-muted); font-size: 0.9rem;">{{ auth()->user()->name }}</span>
-            <form method="POST" action="{{ route('logout') }}" style="display:inline;">
-                @csrf
-                <button type="submit" class="btn-logout"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
-            </form>
-        @else
-            <a href="{{ route('login') }}">Đăng nhập</a>
-            <a href="{{ route('register') }}" style="background: var(--primary); color: white !important; border-radius: 10px;">Đăng ký</a>
-        @endauth
-    </div>
-</nav>
+@include('partials.storefront-navbar')
 
 <!-- ===== BREADCRUMB ===== -->
 <div class="breadcrumb-bar">
     <div class="breadcrumb">
-        <a href="/"><i class="fa-solid fa-house"></i> Trang chủ</a>
+        <a href="{{ route('storefront.index') }}"><i class="fa-solid fa-house"></i> Trang chủ</a>
         <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem;"></i>
         <a href="/?category={{ $product->category_id }}">{{ $product->category->name ?? 'Sản phẩm' }}</a>
         <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem;"></i>

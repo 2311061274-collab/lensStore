@@ -400,34 +400,8 @@
 </head>
 <body>
 
-    <!-- Navbar -->
-    <nav class="navbar">
-        <a href="{{ route('storefront.index') }}" class="navbar-brand">
-            <i class="fa-solid fa-camera-retro"></i>
-            LensStore
-        </a>
-        <ul class="nav-links">
-            @if(auth()->check() && in_array(auth()->user()->role, ['admin', 'staff']))
-                <li><a href="{{ route('admin.products.index') }}" class="{{ request()->routeIs('admin.products.*') ? 'active' : '' }}"><i class="fa-solid fa-box"></i> Sản phẩm</a></li>
-                <li><a href="{{ route('admin.categories.index') }}" class="{{ request()->routeIs('admin.categories.*') ? 'active' : '' }}"><i class="fa-solid fa-tags"></i> Danh mục</a></li>
-                @if(auth()->user()->role === 'admin')
-                    <li><a href="{{ route('admin.users.index') }}" class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}"><i class="fa-solid fa-users"></i> Người dùng</a></li>
-                    <li><a href="{{ route('admin.vouchers.index') }}" class="{{ request()->routeIs('admin.vouchers.*') ? 'active' : '' }}"><i class="fa-solid fa-ticket"></i> Voucher</a></li>
-                    <li><a href="{{ route('admin.news.index') }}" class="{{ request()->routeIs('admin.news.*') ? 'active' : '' }}"><i class="fa-solid fa-newspaper"></i> Tin tức</a></li>
-                @endif
-            @else
-                <li><a href="{{ route('storefront.index') }}"><i class="fa-solid fa-arrow-left"></i> Quay lại trang chủ</a></li>
-            @endif
-            @auth
-                <li style="margin-left: 15px;">
-                    <form action="{{ route('logout') }}" method="POST" style="display:inline;">
-                        @csrf
-                        <button type="submit" style="background:none; border:none; color: var(--danger); font-weight: 500; cursor: pointer; padding: 8px 12px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
-                    </form>
-                </li>
-            @endauth
-        </ul>
-    </nav>
+    <!-- Shared Navbar -->
+    @include('partials.storefront-navbar')
 
     <!-- Main Content -->
     <div class="container">
