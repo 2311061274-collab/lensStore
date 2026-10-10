@@ -65,6 +65,11 @@ class ExportStaticSite extends Command
             $this->line('   - Đã sao chép public/uploads');
         }
 
+        if (File::exists(public_path('storage'))) {
+            File::copyDirectory(public_path('storage'), $distDir.'/storage');
+            $this->line('   - Đã sao chép public/storage');
+        }
+
         if (File::exists(public_path('images'))) {
             File::copyDirectory(public_path('images'), $distDir.'/images');
             $this->line('   - Đã sao chép public/images');
@@ -436,7 +441,10 @@ class ExportStaticSite extends Command
             $html = preg_replace('/src="\/(build\/[^"]*)"/', 'src="'.$targetBase.'/$1"', $html);
             $html = preg_replace('/src="\/(uploads\/[^"]*)"/', 'src="'.$targetBase.'/$1"', $html);
             $html = preg_replace('/href="\/(uploads\/[^"]*)"/', 'href="'.$targetBase.'/$1"', $html);
+            $html = preg_replace('/src="\/(storage\/[^"]*)"/', 'src="'.$targetBase.'/$1"', $html);
+            $html = preg_replace('/href="\/(storage\/[^"]*)"/', 'href="'.$targetBase.'/$1"', $html);
             $html = preg_replace('/src="\/(images\/[^"]*)"/', 'src="'.$targetBase.'/$1"', $html);
+            $html = preg_replace('/href="\/(images\/[^"]*)"/', 'href="'.$targetBase.'/$1"', $html);
             $html = str_replace('href="/favicon.ico"', 'href="'.$targetBase.'/favicon.ico"', $html);
 
             // Thay thế các liên kết trang nội bộ

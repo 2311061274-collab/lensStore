@@ -67,18 +67,89 @@ class Product extends Model
     }
 
     /**
-     * Lấy đường dẫn hình ảnh hoặc ảnh mặc định
+     * Lấy đường dẫn hình ảnh chính hoặc ảnh mặc định chuẩn hóa
      */
     public function getImageUrlAttribute(): string
     {
         if (! empty($this->image)) {
-            if (str_starts_with($this->image, 'http://') || str_starts_with($this->image, 'https://')) {
-                return $this->image;
+            $img = trim($this->image);
+
+            if (str_starts_with($img, 'http://') || str_starts_with($img, 'https://')) {
+                return $img;
             }
 
-            return asset($this->image);
+            if (str_starts_with($img, '//')) {
+                return 'https:'.$img;
+            }
+
+            return asset(ltrim($img, '/'));
         }
 
         return 'https://images.unsplash.com/photo-1617005082133-548c4dd27f35?w=500&auto=format&fit=crop&q=80';
+    }
+
+    /**
+     * Danh sách URL thư viện ảnh (Gallery) đã chuẩn hóa đầy đủ
+     */
+    public function getGalleryImageUrlsAttribute(): array
+    {
+        $gallery = is_array($this->gallery_images) ? $this->gallery_images : [];
+        $urls = [];
+
+        foreach ($gallery as $item) {
+            $rawUrl = is_array($item) ? ($item['url'] ?? '') : (is_string($item) ? $item : '');
+            $rawUrl = trim($rawUrl);
+
+            if (empty($rawUrl)) {
+                continue;
+            }
+
+            if (str_starts_with($rawUrl, 'http://') || str_starts_with($rawUrl, 'https://')) {
+                $urls[] = $rawUrl;
+            } elseif (str_starts_with($rawUrl, '//')) {
+                $urls[] = 'https:'.$rawUrl;
+            } else {
+                $urls[] = asset(ltrim($rawUrl, '/'));
+            }
+        }
+
+        return $urls;
+    }
+
+    /**
+     * Danh sách ảnh chụp mẫu (Sample Photos) với URL đã chuẩn hóa đầy đủ
+     */
+    public function getSampleImagesFormattedAttribute(): array
+    {
+        $samples = is_array($this->sample_images) ? $this->sample_images : [];
+        $formatted = [];
+
+        foreach ($samples as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $rawUrl = trim($item['url'] ?? '');
+            if (empty($rawUrl)) {
+                continue;
+            }
+
+            $finalUrl = $rawUrl;
+            if (str_starts_with($rawUrl, 'http://') || str_starts_with($rawUrl, 'https://')) {
+                $finalUrl = $rawUrl;
+            } elseif (str_starts_with($rawUrl, '//')) {
+                $finalUrl = 'https:'.$rawUrl;
+            } else {
+                $finalUrl = asset(ltrim($rawUrl, '/'));
+            }
+
+            $formatted[] = [
+                'url' => $finalUrl,
+                'tag' => $item['tag'] ?? '',
+                'text' => $item['text'] ?? '',
+            ];
+        }
+
+        return $formatted;
     }
 }

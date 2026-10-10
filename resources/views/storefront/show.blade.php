@@ -182,9 +182,8 @@
     <!-- IMAGE COLUMN -->
     <div class="img-section">
         @php
-            $galleryImages = is_array($product->gallery_images) ? $product->gallery_images : [];
-            $galleryUrls = array_map(function($item) { return is_array($item) ? ($item['url'] ?? '') : $item; }, $galleryImages);
-            $allImages = array_merge([$product->image_url], $galleryUrls);
+            $galleryUrls = $product->gallery_image_urls;
+            $allImages = array_values(array_filter(array_merge([$product->image_url], $galleryUrls)));
             // Fallback demo gallery images if none saved
             if (count($allImages) <= 1) {
                 $allImages = [
@@ -194,15 +193,16 @@
                     'https://images.unsplash.com/photo-1617005082133-548c4dd27f35?w=700&auto=format&fit=crop&q=80',
                 ];
             }
+            $defaultFallback = 'https://images.unsplash.com/photo-1617005082133-548c4dd27f35?w=700&auto=format&fit=crop&q=80';
         @endphp
 
         <div class="main-img-wrap" id="mainImgWrap">
-            <img src="{{ $allImages[0] }}" alt="{{ $product->name }}" class="main-img" id="mainImg">
+            <img src="{{ $allImages[0] }}" alt="{{ $product->name }}" class="main-img" id="mainImg" onerror="this.onerror=null;this.src='{{ $defaultFallback }}';">
         </div>
         <div class="thumb-grid">
             @foreach($allImages as $idx => $img)
                 <div class="thumb {{ $idx == 0 ? 'active' : '' }}" onclick="switchImg('{{ $img }}', this)">
-                    <img src="{{ $img }}" alt="Ảnh {{ $idx + 1 }}">
+                    <img src="{{ $img }}" alt="Ảnh {{ $idx + 1 }}" onerror="this.onerror=null;this.src='{{ $defaultFallback }}';">
                 </div>
             @endforeach
         </div>
@@ -339,8 +339,9 @@
 
 <!-- ===== SAMPLE PHOTOS ===== -->
 @php
-    $sampleData = is_array($product->sample_images) ? $product->sample_images : [];
+    $sampleData = $product->sample_images_formatted;
 @endphp
+@if(count($sampleData) > 0)
 <section class="sample-section">
     <div class="sample-inner">
         <div class="sample-header">
@@ -351,7 +352,7 @@
         <div class="sample-grid">
             @foreach($sampleData as $s)
                 <div class="sample-item">
-                    <img src="{{ $s['url'] ?? '' }}" alt="{{ $s['text'] ?? '' }}">
+                    <img src="{{ $s['url'] }}" alt="{{ $s['text'] ?? '' }}" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1510127034890-ba27508e9f1c?w=700&auto=format&fit=crop&q=80';">
                     <div class="sample-meta">
                         <div class="sample-tag">{{ $s['tag'] ?? '' }}</div>
                         <div class="sample-text">{{ $s['text'] ?? '' }}</div>
@@ -361,6 +362,7 @@
         </div>
     </div>
 </section>
+@endif
 
 <!-- ===== DESCRIPTION ===== -->
 <div class="desc-section">

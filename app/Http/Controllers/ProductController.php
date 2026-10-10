@@ -7,6 +7,7 @@ use App\Models\InventoryTransaction;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
@@ -124,25 +125,21 @@ class ProductController extends Controller
         ]);
 
         $imagePath = null;
+        $destinationPath = public_path('uploads/products');
 
-        // Xử lý upload ảnh tệp tin
+        // Xử lý upload ảnh chính
         if ($request->hasFile('image_file')) {
             $file = $request->file('image_file');
-            $extension = strtolower($file->getClientOriginalExtension());
-            $safeExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-            if (! in_array($extension, $safeExtensions)) {
-                return back()->withErrors(['image_file' => 'Định dạng ảnh không được hỗ trợ.'])->withInput();
+            if ($file->isValid()) {
+                File::ensureDirectoryExists($destinationPath);
+                $ext = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension());
+                if (! in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+                    $ext = 'jpg';
+                }
+                $fileName = 'prod_'.date('Ymd_His').'_'.Str::random(12).'.'.$ext;
+                $file->move($destinationPath, $fileName);
+                $imagePath = 'uploads/products/'.$fileName;
             }
-
-            $fileName = time().'_'.uniqid().'.'.$extension;
-            $destinationPath = public_path('uploads/products');
-
-            if (! File::isDirectory($destinationPath)) {
-                File::makeDirectory($destinationPath, 0755, true, true);
-            }
-
-            $file->move($destinationPath, $fileName);
-            $imagePath = 'uploads/products/'.$fileName;
         } elseif ($request->filled('image_url')) {
             $rawUrl = trim($request->input('image_url'));
             $parsed = parse_url($rawUrl);
@@ -165,6 +162,64 @@ class ProductController extends Controller
             'image' => $imagePath,
             'status' => $validated['status'],
         ];
+
+        // Xử lý Gallery Images nếu có
+        if ($request->has('gallery_urls')) {
+            $gallery = [];
+            $galleryUrls = $request->input('gallery_urls', []);
+            $galleryCaps = $request->input('gallery_caps', []);
+            $galleryFiles = $request->file('gallery_files', []);
+
+            File::ensureDirectoryExists($destinationPath);
+
+            foreach ($galleryUrls as $i => $url) {
+                $cap = $galleryCaps[$i] ?? '';
+                $finalUrl = $url;
+
+                if (isset($galleryFiles[$i]) && $galleryFiles[$i]->isValid()) {
+                    $gFile = $galleryFiles[$i];
+                    $gExt = strtolower($gFile->guessExtension() ?: $gFile->getClientOriginalExtension());
+                    $gName = 'prod_g_'.date('Ymd_His').'_'.Str::random(12).'.'.$gExt;
+                    $gFile->move($destinationPath, $gName);
+                    $finalUrl = 'uploads/products/'.$gName;
+                }
+
+                if (! empty($finalUrl)) {
+                    $gallery[] = ['url' => $finalUrl, 'cap' => $cap];
+                }
+            }
+            $productData['gallery_images'] = $gallery;
+        }
+
+        // Xử lý Sample Images nếu có
+        if ($request->has('sample_urls')) {
+            $samples = [];
+            $sampleUrls = $request->input('sample_urls', []);
+            $sampleTags = $request->input('sample_tags', []);
+            $sampleTexts = $request->input('sample_texts', []);
+            $sampleFiles = $request->file('sample_files', []);
+
+            File::ensureDirectoryExists($destinationPath);
+
+            foreach ($sampleUrls as $i => $url) {
+                $tag = $sampleTags[$i] ?? '';
+                $text = $sampleTexts[$i] ?? '';
+                $finalUrl = $url;
+
+                if (isset($sampleFiles[$i]) && $sampleFiles[$i]->isValid()) {
+                    $sFile = $sampleFiles[$i];
+                    $sExt = strtolower($sFile->guessExtension() ?: $sFile->getClientOriginalExtension());
+                    $sName = 'prod_s_'.date('Ymd_His').'_'.Str::random(12).'.'.$sExt;
+                    $sFile->move($destinationPath, $sName);
+                    $finalUrl = 'uploads/products/'.$sName;
+                }
+
+                if (! empty($finalUrl)) {
+                    $samples[] = ['url' => $finalUrl, 'tag' => $tag, 'text' => $text];
+                }
+            }
+            $productData['sample_images'] = $samples;
+        }
 
         Product::create($productData);
 
@@ -222,39 +277,41 @@ class ProductController extends Controller
             'sku.unique' => 'Mã SKU này đã tồn tại trên sản phẩm khác.',
             'price.required' => 'Vui lòng nhập giá bán.',
             'price.numeric' => 'Giá bán phải là chữ số hợp lệ.',
-            'image_file.image' => 'Tệp tải lên phải là hình ảnh.',
+            'image_file.image' => 'Tệp tải lên phải là hình ảnh (jpg, png, webp, gif).',
+            'image_file.max' => 'Dung lượng ảnh tối đa là 5MB.',
         ]);
 
-        $imagePath = $product->image;
+        $oldImage = $product->image;
+        $imagePath = $oldImage; // Mặc định: Giữ nguyên ảnh cũ nếu không chọn ảnh mới
+        $destinationPath = public_path('uploads/products');
+        $hasNewImage = false;
 
-        // Nếu người dùng tải lên ảnh mới
+        // Nếu người dùng tải lên ảnh mới từ máy tính
         if ($request->hasFile('image_file')) {
-            // Xóa ảnh cũ nếu nằm trong thư mục uploads
-            if ($product->image && ! str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
-                File::delete(public_path($product->image));
-            }
-
             $file = $request->file('image_file');
-            $extension = strtolower($file->getClientOriginalExtension());
-            $fileName = time().'_'.uniqid().'.'.$extension;
-            $destinationPath = public_path('uploads/products');
+            if ($file->isValid()) {
+                File::ensureDirectoryExists($destinationPath);
+                $ext = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension());
+                if (! in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
+                    $ext = 'jpg';
+                }
+                $fileName = 'prod_'.date('Ymd_His').'_'.Str::random(12).'.'.$ext;
+                $file->move($destinationPath, $fileName);
 
-            if (! File::isDirectory($destinationPath)) {
-                File::makeDirectory($destinationPath, 0755, true, true);
+                // Lưu ảnh mới thành công -> chuẩn bị gán và đánh dấu thay đổi
+                $imagePath = 'uploads/products/'.$fileName;
+                $hasNewImage = true;
             }
-
-            $file->move($destinationPath, $fileName);
-            $imagePath = 'uploads/products/'.$fileName;
         } elseif ($request->filled('image_url')) {
             $rawUrl = trim($request->input('image_url'));
             $parsed = parse_url($rawUrl);
             if (! isset($parsed['scheme']) || ! in_array(strtolower($parsed['scheme']), ['http', 'https'])) {
                 return back()->withErrors(['image_url' => 'URL hình ảnh phải có giao thức http:// hoặc https:// hợp lệ.'])->withInput();
             }
-            if ($product->image && ! str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
-                File::delete(public_path($product->image));
+            if ($rawUrl !== $oldImage) {
+                $imagePath = $rawUrl;
+                $hasNewImage = true;
             }
-            $imagePath = $rawUrl;
         }
 
         // Không cho phép sửa tồn kho trực tiếp từ form edit (Bảo đảm nguyên tắc WMS/Mini-ERP)
@@ -278,15 +335,18 @@ class ProductController extends Controller
             $galleryCaps = $request->input('gallery_caps', []);
             $galleryFiles = $request->file('gallery_files', []);
 
+            File::ensureDirectoryExists($destinationPath);
+
             foreach ($galleryUrls as $i => $url) {
                 $cap = $galleryCaps[$i] ?? '';
                 $finalUrl = $url;
 
-                if (isset($galleryFiles[$i])) {
-                    $file = $galleryFiles[$i];
-                    $fileName = time().'_g_'.uniqid().'.'.$file->getClientOriginalExtension();
-                    $file->move(public_path('uploads/products'), $fileName);
-                    $finalUrl = 'uploads/products/'.$fileName;
+                if (isset($galleryFiles[$i]) && $galleryFiles[$i]->isValid()) {
+                    $gFile = $galleryFiles[$i];
+                    $gExt = strtolower($gFile->guessExtension() ?: $gFile->getClientOriginalExtension());
+                    $gName = 'prod_g_'.date('Ymd_His').'_'.Str::random(12).'.'.$gExt;
+                    $gFile->move($destinationPath, $gName);
+                    $finalUrl = 'uploads/products/'.$gName;
                 }
 
                 if (! empty($finalUrl)) {
@@ -304,16 +364,19 @@ class ProductController extends Controller
             $sampleTexts = $request->input('sample_texts', []);
             $sampleFiles = $request->file('sample_files', []);
 
+            File::ensureDirectoryExists($destinationPath);
+
             foreach ($sampleUrls as $i => $url) {
                 $tag = $sampleTags[$i] ?? '';
                 $text = $sampleTexts[$i] ?? '';
                 $finalUrl = $url;
 
-                if (isset($sampleFiles[$i])) {
-                    $file = $sampleFiles[$i];
-                    $fileName = time().'_s_'.uniqid().'.'.$file->getClientOriginalExtension();
-                    $file->move(public_path('uploads/products'), $fileName);
-                    $finalUrl = 'uploads/products/'.$fileName;
+                if (isset($sampleFiles[$i]) && $sampleFiles[$i]->isValid()) {
+                    $sFile = $sampleFiles[$i];
+                    $sExt = strtolower($sFile->guessExtension() ?: $sFile->getClientOriginalExtension());
+                    $sName = 'prod_s_'.date('Ymd_His').'_'.Str::random(12).'.'.$sExt;
+                    $sFile->move($destinationPath, $sName);
+                    $finalUrl = 'uploads/products/'.$sName;
                 }
 
                 if (! empty($finalUrl)) {
@@ -323,7 +386,16 @@ class ProductController extends Controller
             $productData['sample_images'] = $samples;
         }
 
+        // Cập nhật cơ sở dữ liệu
         $product->update($productData);
+
+        // Sau khi lưu DB thành công: Nếu có ảnh mới và ảnh cũ là file local, dọn dẹp file cũ nếu không còn ai dùng
+        if ($hasNewImage && $oldImage && ! str_starts_with($oldImage, 'http')) {
+            $stillUsed = Product::where('id', '!=', $product->id)->where('image', $oldImage)->exists();
+            if (! $stillUsed && File::exists(public_path($oldImage))) {
+                File::delete(public_path($oldImage));
+            }
+        }
 
         return redirect()->route('admin.products.index')
             ->with('success', 'Cập nhật ống kính "'.$product->name.'" thành công!');
@@ -344,9 +416,12 @@ class ProductController extends Controller
             return back()->with('error', "Không thể xóa ống kính '{$name}' vì đã phát sinh lịch sử đơn hàng hoặc thẻ kho. Hãy chuyển trạng thái sản phẩm sang 'Hết hàng' (Ngừng kinh doanh) để bảo vệ toàn vẹn dữ liệu kế toán.");
         }
 
-        // Xóa ảnh local nếu có
-        if ($product->image && ! str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
-            File::delete(public_path($product->image));
+        // Xóa ảnh local nếu không còn sản phẩm khác sử dụng
+        if ($product->image && ! str_starts_with($product->image, 'http')) {
+            $stillUsed = Product::where('id', '!=', $product->id)->where('image', $product->image)->exists();
+            if (! $stillUsed && File::exists(public_path($product->image))) {
+                File::delete(public_path($product->image));
+            }
         }
 
         $product->delete();

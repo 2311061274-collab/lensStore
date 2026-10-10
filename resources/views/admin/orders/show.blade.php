@@ -78,7 +78,16 @@
                 <tbody>
                 @foreach($order->items as $item)
                     <tr>
-                        <td><strong>{{ $item->product_name }}</strong></td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:.75rem;">
+                                @if($item->product && $item->product->image_url)
+                                    <img src="{{ $item->product->image_url }}" alt="{{ $item->product_name }}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:#1a1d24;" onerror="this.src='https://images.unsplash.com/photo-1617005082133-548c4dd27f35?w=200&auto=format&fit=crop&q=80'">
+                                @else
+                                    <div style="width:40px;height:40px;border-radius:6px;background:var(--card-sub);display:flex;align-items:center;justify-content:center;color:var(--muted);"><i class="fa-solid fa-camera"></i></div>
+                                @endif
+                                <span><strong>{{ $item->product_name }}</strong></span>
+                            </div>
+                        </td>
                         <td>{{ $item->quantity }}</td>
                         <td>{{ number_format($item->unit_price, 0, ',', '.') }} ₫</td>
                         <td>{{ number_format($item->subtotal, 0, ',', '.') }} ₫</td>
