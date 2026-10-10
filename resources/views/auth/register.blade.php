@@ -175,15 +175,11 @@
     <div class="progress-bar">
         <div class="step-item active" id="step-indicator-1">
             <div class="step-circle">1</div>
-            <div class="step-label">Cá nhân</div>
+            <div class="step-label">Thông tin cá nhân</div>
         </div>
         <div class="step-item" id="step-indicator-2">
             <div class="step-circle">2</div>
-            <div class="step-label">Pháp lý</div>
-        </div>
-        <div class="step-item" id="step-indicator-3">
-            <div class="step-circle">3</div>
-            <div class="step-label">Tài khoản</div>
+            <div class="step-label">Thiết lập tài khoản</div>
         </div>
     </div>
 
@@ -213,25 +209,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Ngày sinh <span class="required">*</span></label>
+                    <label>Email liên hệ <span class="required">*</span></label>
                     <div class="input-wrap">
-                        <i class="fa-solid fa-cake-candles"></i>
-                        <input type="date" name="birthday" class="form-control {{ $errors->has('birthday') ? 'is-error' : '' }}" value="{{ old('birthday') }}" max="{{ date('Y-m-d', strtotime('-18 years')) }}" required>
+                        <i class="fa-solid fa-envelope"></i>
+                        <input type="email" name="email" class="form-control {{ $errors->has('email') ? 'is-error' : '' }}" placeholder="email@example.com" value="{{ old('email') }}" required>
                     </div>
-                    <div class="help-text">Phải đủ 18 tuổi trở lên</div>
-                </div>
-
-                <div class="form-group">
-                    <label>Giới tính <span class="required">*</span></label>
-                    <div class="input-wrap">
-                        <i class="fa-solid fa-venus-mars"></i>
-                        <select name="gender" class="form-control {{ $errors->has('gender') ? 'is-error' : '' }}" required>
-                            <option value="">-- Chọn giới tính --</option>
-                            <option value="male" {{ old('gender') == 'male' ? 'selected' : '' }}>Nam</option>
-                            <option value="female" {{ old('gender') == 'female' ? 'selected' : '' }}>Nữ</option>
-                            <option value="other" {{ old('gender') == 'other' ? 'selected' : '' }}>Khác</option>
-                        </select>
-                    </div>
+                    <div class="help-text">Mã xác thực OTP 6 số sẽ được gửi về email này</div>
                 </div>
 
                 <div class="form-group">
@@ -243,73 +226,50 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Email liên hệ <span class="required">*</span></label>
+                    <label>Ngày sinh</label>
                     <div class="input-wrap">
-                        <i class="fa-solid fa-envelope"></i>
-                        <input type="email" name="email" class="form-control {{ $errors->has('email') ? 'is-error' : '' }}" placeholder="email@example.com" value="{{ old('email') }}" required>
+                        <i class="fa-solid fa-cake-candles"></i>
+                        <input type="date" name="birthday" class="form-control {{ $errors->has('birthday') ? 'is-error' : '' }}" value="{{ old('birthday') }}" max="{{ date('Y-m-d', strtotime('-16 years')) }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Giới tính</label>
+                    <div class="input-wrap">
+                        <i class="fa-solid fa-venus-mars"></i>
+                        <select name="gender" class="form-control {{ $errors->has('gender') ? 'is-error' : '' }}">
+                            <option value="male" {{ old('gender', 'male') == 'male' ? 'selected' : '' }}>Nam</option>
+                            <option value="female" {{ old('gender') == 'female' ? 'selected' : '' }}>Nữ</option>
+                            <option value="other" {{ old('gender') == 'other' ? 'selected' : '' }}>Khác</option>
+                        </select>
                     </div>
                 </div>
 
                 <div class="form-group full">
-                    <label>Địa chỉ thường trú <span class="required">*</span></label>
+                    <label>Địa chỉ nhận hàng (Tùy chọn)</label>
                     <div class="input-wrap">
                         <i class="fa-solid fa-map-pin"></i>
-                        <input type="text" name="address" class="form-control {{ $errors->has('address') ? 'is-error' : '' }}" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" value="{{ old('address') }}" required>
+                        <input type="text" name="address" class="form-control {{ $errors->has('address') ? 'is-error' : '' }}" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" value="{{ old('address') }}">
+                    </div>
+                </div>
+
+                <div class="form-group full" style="margin-top:0.5rem;">
+                    <div class="security-note" style="margin:0;">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <div><strong>Bảo mật danh tính & quyền riêng tư:</strong> LensStore xác nhận tài khoản qua mã OTP gửi về Email cá nhân. Hệ thống cam kết không yêu cầu CCCD/CMND đối với tài khoản mua sắm thông thường.</div>
                     </div>
                 </div>
             </div>
 
             <div style="margin-top: 1.5rem;">
                 <button type="button" class="btn-primary" onclick="nextStep(1)">
-                    Tiếp theo <i class="fa-solid fa-arrow-right"></i>
+                    Tiếp theo: Thiết lập mật khẩu <i class="fa-solid fa-arrow-right"></i>
                 </button>
             </div>
         </div>
 
-        <!-- STEP 2: Thông tin pháp lý -->
+        <!-- STEP 2: Tạo mật khẩu -->
         <div class="form-step" id="step-2">
-            <div class="section-label"><i class="fa-solid fa-id-card"></i> Xác thực danh tính (CCCD/CMND)</div>
-
-            <div class="security-note">
-                <i class="fa-solid fa-lock"></i>
-                <div>Thông tin CCCD/CMND được thu thập để <strong>xác minh danh tính và bảo vệ quyền lợi</strong> của bạn khi mua sản phẩm có giá trị cao. Tất cả dữ liệu được mã hóa và tuân thủ quy định pháp luật về bảo vệ dữ liệu cá nhân.</div>
-            </div>
-
-            <div class="form-grid">
-                <div class="form-group full">
-                    <label>Số CCCD / CMND <span class="required">*</span></label>
-                    <div class="input-wrap">
-                        <i class="fa-solid fa-id-card"></i>
-                        <input type="text" name="cccd" class="form-control {{ $errors->has('cccd') ? 'is-error' : '' }}" placeholder="001234567890 (12 chữ số)" value="{{ old('cccd') }}" maxlength="20" required>
-                    </div>
-                    <div class="help-text"><i class="fa-solid fa-circle-info"></i> CCCD 12 số hoặc CMND 9 số</div>
-                </div>
-
-                <div class="form-group full" style="margin-top: 1rem;">
-                    <label style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">
-                        <i class="fa-solid fa-triangle-exclamation" style="color: var(--accent);"></i>
-                        Tại sao chúng tôi cần thông tin này?
-                    </label>
-                    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.2rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.8;">
-                        <p>✓ <strong>Bảo vệ quyền lợi khách hàng</strong>: Đảm bảo chỉ chủ sở hữu thật mới có thể yêu cầu bảo hành</p>
-                        <p>✓ <strong>Phòng chống gian lận</strong>: Ngăn chặn tình trạng giả mạo danh tính khi mua sản phẩm cao cấp</p>
-                        <p>✓ <strong>Xuất hóa đơn VAT</strong>: Phục vụ việc xuất hóa đơn theo đúng quy định pháp luật</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="btn-row">
-                <button type="button" class="btn-secondary" onclick="prevStep(2)">
-                    <i class="fa-solid fa-arrow-left"></i> Quay lại
-                </button>
-                <button type="button" class="btn-primary" onclick="nextStep(2)">
-                    Tiếp theo <i class="fa-solid fa-arrow-right"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- STEP 3: Tạo mật khẩu -->
-        <div class="form-step" id="step-3">
             <div class="section-label"><i class="fa-solid fa-key"></i> Thiết lập mật khẩu</div>
 
             <div class="form-grid">
@@ -351,16 +311,16 @@
             <div style="margin: 1.5rem 0;">
                 <div class="terms-check">
                     <input type="checkbox" id="terms" required>
-                    <label for="terms">Tôi đã đọc và đồng ý với <a href="#">Điều khoản dịch vụ</a> và <a href="#">Chính sách quyền riêng tư</a> của LensStore, bao gồm việc thu thập và xử lý thông tin CCCD/CMND để xác minh danh tính.</label>
+                    <label for="terms">Tôi đồng ý với <a href="#">Điều khoản dịch vụ</a> và <a href="#">Chính sách bảo mật</a> của LensStore. Tôi hiểu rằng mã OTP gửi qua Gmail là phương thức xác nhận quyền sở hữu email tại thời điểm đăng ký.</label>
                 </div>
             </div>
 
             <div class="btn-row">
-                <button type="button" class="btn-secondary" onclick="prevStep(3)">
+                <button type="button" class="btn-secondary" onclick="prevStep(2)">
                     <i class="fa-solid fa-arrow-left"></i> Quay lại
                 </button>
                 <button type="submit" class="btn-primary">
-                    <i class="fa-solid fa-user-plus"></i> Hoàn tất đăng ký
+                    <i class="fa-solid fa-envelope-circle-check"></i> Đăng ký & Nhận mã OTP
                 </button>
             </div>
         </div>
@@ -375,22 +335,14 @@
 let currentStep = 1;
 
 function nextStep(from) {
-    // Basic validation for step 1
     if (from === 1) {
-        const required = document.querySelectorAll('#step-' + from + ' [required]');
+        const required = document.querySelectorAll('#step-1 [required]');
         let valid = true;
         required.forEach(el => {
             if (!el.value.trim()) { el.classList.add('is-error'); valid = false; }
             else el.classList.remove('is-error');
         });
         if (!valid) return;
-    }
-    // CCCD validation step 2
-    if (from === 2) {
-        const cccd = document.querySelector('[name="cccd"]');
-        const val = cccd.value.trim();
-        if (val.length < 9) { cccd.classList.add('is-error'); alert('Số CCCD/CMND phải có ít nhất 9 ký tự.'); return; }
-        cccd.classList.remove('is-error');
     }
     setStep(from + 1);
 }
@@ -403,7 +355,7 @@ function setStep(n) {
     document.querySelectorAll('.form-step').forEach(el => el.classList.remove('active'));
     document.getElementById('step-' + n).classList.add('active');
     // Update indicators
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 2; i++) {
         const indicator = document.getElementById('step-indicator-' + i);
         const circle = indicator.querySelector('.step-circle');
         indicator.classList.remove('active', 'done');
@@ -430,9 +382,23 @@ function checkPwStrength(val) {
     hint.textContent = val ? labels[cls] || '' : 'Mật khẩu mạnh nhất khi kết hợp chữ hoa, chữ thường, số và ký tự đặc biệt';
 }
 
-// If validation errors exist, jump to last step
-@if ($errors->any())
-    setStep(3);
+function togglePassword(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// If validation errors exist, jump to step 2 if password error, else step 1
+@if ($errors->has('password'))
+    setStep(2);
 @endif
 </script>
 

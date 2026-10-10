@@ -8,6 +8,8 @@ use App\Support\ChatSupport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
@@ -70,19 +72,19 @@ class ChatController extends Controller
         ]);
 
         $content = trim($data['message'] ?? '');
-        if ($content === '' && !$request->hasFile('image')) {
+        if ($content === '' && ! $request->hasFile('image')) {
             return response()->json(['error' => 'Nội dung tin nhắn hoặc hình ảnh không được để trống'], 422);
         }
 
         $agent = ChatSupport::defaultAgent();
-        if (!$agent) {
+        if (! $agent) {
             return response()->json(['error' => 'Hiện chưa có nhân viên hỗ trợ. Vui lòng thử lại sau.'], 503);
         }
 
         $imagePath = null;
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('chat_images', 'public');
-            $imagePath = 'storage/' . $path;
+            $imagePath = 'storage/'.$path;
         }
 
         $message = Message::create([
@@ -99,66 +101,66 @@ class ChatController extends Controller
         // --- BẮT ĐẦU TÍCH HỢP GEMINI AI ---
         $geminiKey = env('GEMINI_API_KEY');
         $aiDisabled = session('chat_ai_disabled', false);
-        
-        if (!$aiDisabled) {
-            if ($geminiKey && $content) {
-            try {
-                $aiPrompt = "Bạn là trợ lý AI ảo của cửa hàng thiết bị nhiếp ảnh LensStore. Khách hàng vừa nhắn tin: '{$content}'. Hãy trả lời tư vấn thật ngắn gọn, thân thiện, chuyên nghiệp (tối đa 2-3 câu). Không dùng định dạng markdown phức tạp.";
-                
-                $response = \Illuminate\Support\Facades\Http::withoutVerifying()->timeout(8)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={$geminiKey}", [
-                    'contents' => [
-                        [
-                            'parts' => [
-                                ['text' => $aiPrompt]
-                            ]
-                        ]
-                    ]
-                ]);
 
-                if ($response->successful()) {
-                    $aiReply = $response->json('candidates.0.content.parts.0.text');
-                    if ($aiReply) {
+        if (! $aiDisabled) {
+            if ($geminiKey && $content) {
+                try {
+                    $aiPrompt = "Bạn là trợ lý AI ảo của cửa hàng thiết bị nhiếp ảnh LensStore. Khách hàng vừa nhắn tin: '{$content}'. Hãy trả lời tư vấn thật ngắn gọn, thân thiện, chuyên nghiệp (tối đa 2-3 câu). Không dùng định dạng markdown phức tạp.";
+
+                    $response = Http::withoutVerifying()->timeout(8)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={$geminiKey}", [
+                        'contents' => [
+                            [
+                                'parts' => [
+                                    ['text' => $aiPrompt],
+                                ],
+                            ],
+                        ],
+                    ]);
+
+                    if ($response->successful()) {
+                        $aiReply = $response->json('candidates.0.content.parts.0.text');
+                        if ($aiReply) {
+                            Message::create([
+                                'sender_id' => $agent->id,
+                                'receiver_id' => $user->id,
+                                'product_id' => $data['product_id'] ?? null,
+                                'content' => trim($aiReply),
+                                'is_read' => false,
+                            ]);
+                        } else {
+                            Log::error('Gemini AI No Text in Response: '.$response->body());
+                        }
+                    } else {
+                        $errorMsg = $response->json('error.message') ?? 'Lỗi không xác định từ máy chủ AI.';
+                        Log::error('Gemini API Error: '.$response->body());
                         Message::create([
                             'sender_id' => $agent->id,
                             'receiver_id' => $user->id,
                             'product_id' => $data['product_id'] ?? null,
-                            'content' => trim($aiReply),
+                            'content' => '🤖 Xin lỗi, tôi không thể trả lời lúc này (Lỗi: '.$errorMsg.').',
                             'is_read' => false,
                         ]);
-                    } else {
-                        \Illuminate\Support\Facades\Log::error('Gemini AI No Text in Response: ' . $response->body());
                     }
-                } else {
-                    $errorMsg = $response->json('error.message') ?? 'Lỗi không xác định từ máy chủ AI.';
-                    \Illuminate\Support\Facades\Log::error('Gemini API Error: ' . $response->body());
+                } catch (\Exception $e) {
+                    Log::error('Gemini AI Chat Error: '.$e->getMessage());
                     Message::create([
                         'sender_id' => $agent->id,
                         'receiver_id' => $user->id,
                         'product_id' => $data['product_id'] ?? null,
-                        'content' => "🤖 Xin lỗi, tôi không thể trả lời lúc này (Lỗi: " . $errorMsg . ").",
+                        'content' => '🤖 Xin lỗi, tôi đang gặp sự cố kết nối mạng ('.$e->getMessage().').',
                         'is_read' => false,
                     ]);
                 }
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Gemini AI Chat Error: ' . $e->getMessage());
+            } elseif ($content) {
+                // Chế độ DEMO khi chưa cài đặt Key
                 Message::create([
                     'sender_id' => $agent->id,
                     'receiver_id' => $user->id,
                     'product_id' => $data['product_id'] ?? null,
-                    'content' => "🤖 Xin lỗi, tôi đang gặp sự cố kết nối mạng (" . $e->getMessage() . ").",
+                    'content' => '🤖 Chào bạn, tôi là AI Assistant của LensStore! (Đây là tin nhắn tự động vì bạn chưa nhập GEMINI_API_KEY trong file .env).',
                     'is_read' => false,
                 ]);
             }
-        } elseif ($content) {
-            // Chế độ DEMO khi chưa cài đặt Key
-            Message::create([
-                'sender_id' => $agent->id,
-                'receiver_id' => $user->id,
-                'product_id' => $data['product_id'] ?? null,
-                'content' => "🤖 Chào bạn, tôi là AI Assistant của LensStore! (Đây là tin nhắn tự động vì bạn chưa nhập GEMINI_API_KEY trong file .env).",
-                'is_read' => false,
-            ]);
-        }
         }
         // --- KẾT THÚC AI ---
 
@@ -169,6 +171,7 @@ class ChatController extends Controller
     {
         $disable = $request->boolean('disable_ai');
         session(['chat_ai_disabled' => $disable]);
+
         return response()->json(['success' => true, 'ai_disabled' => $disable]);
     }
 

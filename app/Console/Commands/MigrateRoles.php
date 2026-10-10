@@ -2,12 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Models\User;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use App\Models\User;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 #[Signature('roles:migrate')]
 #[Description('Migrate legacy roles to Spatie permissions')]
@@ -16,7 +17,7 @@ class MigrateRoles extends Command
     public function handle()
     {
         // Clear cached permissions
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Define base permissions
         $permissions = [
@@ -52,7 +53,7 @@ class MigrateRoles extends Command
         foreach ($users as $user) {
             // Assign role based on the old 'role' string column
             if ($user->role && Role::where('name', $user->role)->exists()) {
-                if (!$user->hasRole($user->role)) {
+                if (! $user->hasRole($user->role)) {
                     $user->assignRole($user->role);
                     $count++;
                 }

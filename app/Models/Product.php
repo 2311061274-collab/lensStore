@@ -14,7 +14,7 @@ class Product extends Model
     protected static function booted()
     {
         static::saving(function ($product) {
-            if (empty($product->brand) && !empty($product->name)) {
+            if (empty($product->brand) && ! empty($product->name)) {
                 $product->brand = explode(' ', trim($product->name))[0];
             }
         });
@@ -63,7 +63,7 @@ class Product extends Model
      */
     public function getFormattedPriceAttribute(): string
     {
-        return number_format($this->price, 0, ',', '.') . ' ₫';
+        return number_format($this->price, 0, ',', '.').' ₫';
     }
 
     /**
@@ -71,10 +71,11 @@ class Product extends Model
      */
     public function getImageUrlAttribute(): string
     {
-        if (!empty($this->image)) {
+        if (! empty($this->image)) {
             if (str_starts_with($this->image, 'http://') || str_starts_with($this->image, 'https://')) {
                 return $this->image;
             }
+
             return asset($this->image);
         }
 

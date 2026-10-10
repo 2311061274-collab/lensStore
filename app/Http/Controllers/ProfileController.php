@@ -12,6 +12,7 @@ class ProfileController extends Controller
     public function edit()
     {
         $user = auth()->user();
+
         return view('profile.edit', compact('user'));
     }
 
@@ -37,7 +38,7 @@ class ProfileController extends Controller
 
         if ($request->hasFile('avatar')) {
             $path = $request->file('avatar')->store('avatars', 'public');
-            $data['avatar'] = 'storage/' . $path;
+            $data['avatar'] = 'storage/'.$path;
         }
 
         $user->update($data);
@@ -57,7 +58,7 @@ class ProfileController extends Controller
             'password' => 'required|string|min:6|confirmed',
         ]);
 
-        if (!\Hash::check($request->current_password, $user->password)) {
+        if (! \Hash::check($request->current_password, $user->password)) {
             return back()->withErrors(['current_password' => 'Mật khẩu hiện tại không chính xác.']);
         }
 

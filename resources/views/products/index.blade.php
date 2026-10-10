@@ -36,6 +36,16 @@
         </select>
     </div>
     <div>
+        <label>Tồn kho</label>
+        <select name="stock_status" class="form-control">
+            <option value="">Tất cả</option>
+            <option value="alert" {{ request('stock_status') == 'alert' ? 'selected' : '' }}>Cảnh báo kho (&lt; 3)</option>
+            <option value="out_of_stock" {{ request('stock_status') == 'out_of_stock' ? 'selected' : '' }}>Hết hàng (0)</option>
+            <option value="low" {{ request('stock_status') == 'low' ? 'selected' : '' }}>Sắp hết (&lt; 3, &gt; 0)</option>
+            <option value="in_stock" {{ request('stock_status') == 'in_stock' ? 'selected' : '' }}>Còn hàng (&ge; 3)</option>
+        </select>
+    </div>
+    <div>
         <label>Sắp xếp</label>
         <select name="sort" class="form-control">
             <option value="latest" {{ request('sort') == 'latest' ? 'selected' : '' }}>Mới nhất</option>
@@ -45,7 +55,7 @@
         </select>
     </div>
     <button type="submit" class="btn btn-outline"><i class="fa-solid fa-filter"></i> Lọc</button>
-    @if(request()->hasAny(['search','category_id','brand','sort']))
+    @if(request()->hasAny(['search','category_id','brand','sort','stock_status']))
         <a href="{{ route('admin.products.index') }}" class="btn btn-outline">Đặt lại</a>
     @endif
 </form>

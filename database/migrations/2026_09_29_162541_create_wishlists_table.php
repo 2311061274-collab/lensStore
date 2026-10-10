@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
-            
+
             // Một người dùng chỉ được thích một sản phẩm 1 lần
             $table->unique(['user_id', 'product_id']);
         });

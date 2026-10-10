@@ -15,6 +15,7 @@ class CartController extends Controller
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->get();
+
         return view('storefront.cart', compact('carts'));
     }
 
@@ -22,7 +23,7 @@ class CartController extends Controller
     {
         $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1'
+            'quantity' => 'required|integer|min:1',
         ]);
 
         $cart = Cart::where('user_id', Auth::id())->where('product_id', $request->product_id)->first();
@@ -36,7 +37,7 @@ class CartController extends Controller
             Cart::create([
                 'user_id' => Auth::id(),
                 'product_id' => $request->product_id,
-                'quantity' => $request->quantity
+                'quantity' => $request->quantity,
             ]);
         }
 
@@ -45,7 +46,7 @@ class CartController extends Controller
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => 'Đã thêm sản phẩm vào giỏ hàng.',
-                'cartCount' => $cartCount
+                'cartCount' => $cartCount,
             ]);
         }
 
@@ -56,7 +57,7 @@ class CartController extends Controller
     {
         $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1'
+            'quantity' => 'required|integer|min:1',
         ]);
 
         Cart::where('user_id', Auth::id())->update(['is_selected' => false]);
@@ -81,7 +82,7 @@ class CartController extends Controller
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'redirect' => route('checkout.index')
+                'redirect' => route('checkout.index'),
             ]);
         }
 
@@ -107,6 +108,7 @@ class CartController extends Controller
         }
 
         $cart->delete();
+
         return redirect()->back()->with('success', 'Đã xóa sản phẩm khỏi giỏ hàng.');
     }
 
@@ -115,7 +117,7 @@ class CartController extends Controller
         $request->validate([
             'selections' => 'required|array',
             'selections.*.id' => 'required|exists:carts,id',
-            'selections.*.is_selected' => 'required|boolean'
+            'selections.*.is_selected' => 'required|boolean',
         ]);
 
         foreach ($request->selections as $item) {
@@ -133,6 +135,7 @@ class CartController extends Controller
         if ($carts->isEmpty()) {
             return redirect()->route('cart.index')->with('error', 'Bạn chưa chọn sản phẩm nào để thanh toán.');
         }
+
         return view('storefront.checkout', compact('carts'));
     }
 
@@ -148,7 +151,7 @@ class CartController extends Controller
         // Xử lý lưu đơn hàng ở đây (chưa yêu cầu trong task, chỉ cần form thanh toán)
 
         Cart::where('user_id', Auth::id())->delete();
-        
+
         return redirect()->route('storefront.index')->with('success', 'Đặt hàng thành công!');
     }
 }

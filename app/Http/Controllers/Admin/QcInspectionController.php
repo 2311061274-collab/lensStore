@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\InventoryTransaction;
+use App\Models\Product;
 use App\Models\QcInspection;
 use App\Models\ReturnRequest;
-use App\Models\Product;
-use App\Models\InventoryTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -16,6 +16,7 @@ class QcInspectionController extends Controller
     {
         $inspections = QcInspection::with('returnRequest', 'product', 'user')->latest()->paginate(15);
         $pendingReturns = ReturnRequest::with('order.items.product')->where('status', 'approved')->get();
+
         return view('admin.qc_inspections.index', compact('inspections', 'pendingReturns'));
     }
 
@@ -26,7 +27,7 @@ class QcInspectionController extends Controller
             ?: ReturnRequest::with('order.items.product')->where('status', 'approved')->first()
             ?: ReturnRequest::with('order.items.product')->first();
 
-        if (!$returnRequest) {
+        if (! $returnRequest) {
             return redirect()->route('admin.qc_inspections.index')->with('error', 'Chưa có yêu cầu trả hàng nào cần kiểm định.');
         }
 
@@ -41,7 +42,7 @@ class QcInspectionController extends Controller
             'condition' => 'required|in:perfect,scratched,broken,used',
             'final_action' => 'required|in:restock,send_to_vendor,liquidate',
             'quantity' => 'required|integer|min:1',
-            'inspection_note' => 'nullable|string'
+            'inspection_note' => 'nullable|string',
         ]);
 
         DB::beginTransaction();
@@ -53,21 +54,21 @@ class QcInspectionController extends Controller
                 'condition' => $request->condition,
                 'final_action' => $request->final_action,
                 'quantity' => $request->quantity,
-                'inspection_note' => $request->inspection_note
+                'inspection_note' => $request->inspection_note,
             ]);
 
             $product = Product::findOrFail($request->product_id);
-            
+
             // Xử lý luồng tồn kho dựa trên Action
             if ($request->final_action === 'restock') {
                 $product->increment('stock', $request->quantity); // Cộng lại kho bán
-                $note = 'QC: Hoàn hảo, nhập lại kho (Mã phiếu trả: ' . $request->return_request_id . ')';
+                $note = 'QC: Hoàn hảo, nhập lại kho (Mã phiếu trả: '.$request->return_request_id.')';
             } elseif ($request->final_action === 'send_to_vendor') {
                 $product->increment('defective_stock', $request->quantity); // Vào kho lỗi
-                $note = 'QC: Hàng lỗi, nhập kho chờ bảo hành (Mã phiếu trả: ' . $request->return_request_id . ')';
+                $note = 'QC: Hàng lỗi, nhập kho chờ bảo hành (Mã phiếu trả: '.$request->return_request_id.')';
             } else {
                 $product->increment('defective_stock', $request->quantity); // Hoặc kho thanh lý (dùng chung kho lỗi tạm)
-                $note = 'QC: Hàng cũ/hỏng, nhập kho chờ thanh lý (Mã phiếu trả: ' . $request->return_request_id . ')';
+                $note = 'QC: Hàng cũ/hỏng, nhập kho chờ thanh lý (Mã phiếu trả: '.$request->return_request_id.')';
             }
 
             InventoryTransaction::create([
@@ -76,17 +77,19 @@ class QcInspectionController extends Controller
                 'quantity' => $request->quantity,
                 'reference_type' => QcInspection::class,
                 'reference_id' => $qc->id,
-                'note' => $note
+                'note' => $note,
             ]);
 
             // Tự động chuyển trạng thái đơn trả hàng thành hoàn tất (giả định)
             ReturnRequest::where('id', $request->return_request_id)->update(['status' => 'completed']);
 
             DB::commit();
+
             return redirect()->route('admin.qc_inspections.index')->with('success', 'Đã lưu kết quả kiểm định & cập nhật kho!');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Lỗi: ' . $e->getMessage());
+
+            return back()->with('error', 'Lỗi: '.$e->getMessage());
         }
     }
 }

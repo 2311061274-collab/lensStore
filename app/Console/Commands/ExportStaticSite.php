@@ -2,11 +2,20 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Cart;
+use App\Models\Category;
+use App\Models\GoodsReceipt;
+use App\Models\News;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\ReturnRequest;
+use App\Models\User;
+use App\Models\Voucher;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
-use App\Models\Product;
-use App\Models\News;
+use Spatie\Permission\Models\Role;
 
 class ExportStaticSite extends Command
 {
@@ -30,7 +39,7 @@ class ExportStaticSite extends Command
     public function handle()
     {
         $rawBasePath = $this->option('base-path') ?? '';
-        $basePrefix = !empty($rawBasePath) ? '/' . trim($rawBasePath, '/') : '';
+        $basePrefix = ! empty($rawBasePath) ? '/'.trim($rawBasePath, '/') : '';
         $distDir = base_path('dist');
 
         $this->info("🚀 Bắt đầu xuất tĩnh website cho GitHub Pages (Base prefix: '{$basePrefix}')...");
@@ -42,51 +51,51 @@ class ExportStaticSite extends Command
         File::makeDirectory($distDir, 0755, true);
 
         // 2. Sao chép tài nguyên tĩnh (Vite build assets, uploads, images, favicon)
-        $this->info("📦 Đang sao chép assets...");
-        
+        $this->info('📦 Đang sao chép assets...');
+
         if (File::exists(public_path('build'))) {
-            File::copyDirectory(public_path('build'), $distDir . '/build');
-            $this->line("   - Đã sao chép public/build");
+            File::copyDirectory(public_path('build'), $distDir.'/build');
+            $this->line('   - Đã sao chép public/build');
         } else {
             $this->warn("   ! Cảnh báo: public/build chưa tồn tại. Hãy chạy 'npm run build' trước.");
         }
 
         if (File::exists(public_path('uploads'))) {
-            File::copyDirectory(public_path('uploads'), $distDir . '/uploads');
-            $this->line("   - Đã sao chép public/uploads");
+            File::copyDirectory(public_path('uploads'), $distDir.'/uploads');
+            $this->line('   - Đã sao chép public/uploads');
         }
 
         if (File::exists(public_path('images'))) {
-            File::copyDirectory(public_path('images'), $distDir . '/images');
-            $this->line("   - Đã sao chép public/images");
+            File::copyDirectory(public_path('images'), $distDir.'/images');
+            $this->line('   - Đã sao chép public/images');
         }
 
         if (File::exists(public_path('favicon.ico'))) {
-            File::copy(public_path('favicon.ico'), $distDir . '/favicon.ico');
+            File::copy(public_path('favicon.ico'), $distDir.'/favicon.ico');
         }
 
         // Tạo file .nojekyll để GitHub Pages không dùng Jekyll xử lý các file _
-        File::put($distDir . '/.nojekyll', '');
-        $this->line("   - Đã tạo .nojekyll");
+        File::put($distDir.'/.nojekyll', '');
+        $this->line('   - Đã tạo .nojekyll');
 
         // 3. Danh sách các trang tĩnh cần render (Key: Route path, Value: array config)
         $allPages = [];
 
         // Trang công khai Storefront
         $publicPages = [
-            '/'                 => '',
-            '/san-pham'         => 'san-pham',
-            '/products'         => 'products',
-            '/gioi-thieu'       => 'gioi-thieu',
-            '/about'            => 'about',
-            '/ho-tro'           => 'ho-tro',
-            '/support'          => 'support',
-            '/contact'          => 'contact',
-            '/tin-tuc'          => 'tin-tuc',
-            '/news'             => 'news',
-            '/login'            => 'login',
-            '/register'         => 'register',
-            '/forgot-password'  => 'forgot-password',
+            '/' => '',
+            '/san-pham' => 'san-pham',
+            '/products' => 'products',
+            '/gioi-thieu' => 'gioi-thieu',
+            '/about' => 'about',
+            '/ho-tro' => 'ho-tro',
+            '/support' => 'support',
+            '/contact' => 'contact',
+            '/tin-tuc' => 'tin-tuc',
+            '/news' => 'news',
+            '/login' => 'login',
+            '/register' => 'register',
+            '/forgot-password' => 'forgot-password',
         ];
 
         foreach ($publicPages as $routePath => $slug) {
@@ -132,53 +141,53 @@ class ExportStaticSite extends Command
         $adminUser = null;
         $customerUser = null;
         try {
-            $adminUser = \App\Models\User::where('role', 'admin')->first() ?: \App\Models\User::first();
-            $customerUser = \App\Models\User::where('role', 'customer')->first() ?: $adminUser;
+            $adminUser = User::where('role', 'admin')->first() ?: User::first();
+            $customerUser = User::where('role', 'customer')->first() ?: $adminUser;
 
             if ($customerUser) {
                 $sampleProduct = Product::first();
                 if ($sampleProduct) {
-                    \App\Models\Cart::updateOrCreate(
+                    Cart::updateOrCreate(
                         ['user_id' => $customerUser->id, 'product_id' => $sampleProduct->id],
                         ['quantity' => 1, 'is_selected' => true]
                     );
                 }
             }
         } catch (\Throwable $e) {
-            $this->warn("   ! Không thể nạp Demo Users: " . $e->getMessage());
+            $this->warn('   ! Không thể nạp Demo Users: '.$e->getMessage());
         }
 
         // Thu thập toàn bộ sản phẩm ống kính từ database
         try {
             $products = Product::all();
             foreach ($products as $prod) {
-                $allPages['/product/' . $prod->id] = ['slug' => 'product/' . $prod->id, 'user' => null, 'session' => []];
-                $allPages['/san-pham/' . $prod->id] = ['slug' => 'san-pham/' . $prod->id, 'user' => null, 'session' => []];
+                $allPages['/product/'.$prod->id] = ['slug' => 'product/'.$prod->id, 'user' => null, 'session' => []];
+                $allPages['/san-pham/'.$prod->id] = ['slug' => 'san-pham/'.$prod->id, 'user' => null, 'session' => []];
             }
-            $this->info("   - Đã thu thập " . $products->count() . " sản phẩm ống kính.");
+            $this->info('   - Đã thu thập '.$products->count().' sản phẩm ống kính.');
         } catch (\Throwable $e) {
-            $this->warn("   ! Không thể đọc danh sách Product từ database: " . $e->getMessage());
+            $this->warn('   ! Không thể đọc danh sách Product từ database: '.$e->getMessage());
         }
 
         // Thu thập toàn bộ bài viết tin tức từ database
         try {
             $newsArticles = News::all();
             foreach ($newsArticles as $article) {
-                $allPages['/tin-tuc/' . $article->id] = ['slug' => 'tin-tuc/' . $article->id, 'user' => null, 'session' => []];
-                $allPages['/news/' . $article->id] = ['slug' => 'news/' . $article->id, 'user' => null, 'session' => []];
+                $allPages['/tin-tuc/'.$article->id] = ['slug' => 'tin-tuc/'.$article->id, 'user' => null, 'session' => []];
+                $allPages['/news/'.$article->id] = ['slug' => 'news/'.$article->id, 'user' => null, 'session' => []];
             }
-            $this->info("   - Đã thu thập " . $newsArticles->count() . " bài viết tin tức.");
+            $this->info('   - Đã thu thập '.$newsArticles->count().' bài viết tin tức.');
         } catch (\Throwable $e) {
-            $this->warn("   ! Không thể đọc danh sách News từ database: " . $e->getMessage());
+            $this->warn('   ! Không thể đọc danh sách News từ database: '.$e->getMessage());
         }
 
         // Trang trải nghiệm giỏ hàng & tài khoản khách hàng
         $customerPages = [
-            '/cart'             => 'cart',
-            '/checkout'         => 'checkout',
-            '/wishlist'         => 'wishlist',
-            '/orders'           => 'orders',
-            '/profile'          => 'profile',
+            '/cart' => 'cart',
+            '/checkout' => 'checkout',
+            '/wishlist' => 'wishlist',
+            '/orders' => 'orders',
+            '/profile' => 'profile',
         ];
 
         foreach ($customerPages as $routePath => $slug) {
@@ -187,62 +196,62 @@ class ExportStaticSite extends Command
 
         // Đơn hàng của khách hàng & các form hành động (chi tiết, đổi trả, đánh giá)
         try {
-            $orders = \App\Models\Order::all();
+            $orders = Order::all();
             foreach ($orders as $ord) {
-                $allPages['/orders/' . $ord->id] = [
-                    'slug' => 'orders/' . $ord->id,
+                $allPages['/orders/'.$ord->id] = [
+                    'slug' => 'orders/'.$ord->id,
                     'user' => $customerUser,
                     'session' => [],
                 ];
 
                 // Form đánh giá
-                $allPages['/orders/' . $ord->id . '/review'] = [
-                    'slug' => 'orders/' . $ord->id . '/review',
+                $allPages['/orders/'.$ord->id.'/review'] = [
+                    'slug' => 'orders/'.$ord->id.'/review',
                     'user' => $customerUser,
                     'session' => [],
                 ];
 
                 // Form đổi trả (cho đơn không có return request trước đó)
-                if (!\App\Models\ReturnRequest::where('order_id', $ord->id)->exists() && $ord->status === 'completed') {
-                    $allPages['/orders/' . $ord->id . '/return'] = [
-                        'slug' => 'orders/' . $ord->id . '/return',
+                if (! ReturnRequest::where('order_id', $ord->id)->exists() && $ord->status === 'completed') {
+                    $allPages['/orders/'.$ord->id.'/return'] = [
+                        'slug' => 'orders/'.$ord->id.'/return',
                         'user' => $customerUser,
                         'session' => [],
                     ];
                 }
             }
-            $this->info("   - Đã thu thập " . $orders->count() . " đơn hàng khách hàng.");
+            $this->info('   - Đã thu thập '.$orders->count().' đơn hàng khách hàng.');
         } catch (\Throwable $e) {
-            $this->warn("   ! Lỗi thu thập đơn hàng: " . $e->getMessage());
+            $this->warn('   ! Lỗi thu thập đơn hàng: '.$e->getMessage());
         }
 
         // Trang quản trị hệ thống Admin
         $adminBasePages = [
-            '/admin'                 => 'admin',
-            '/admin/orders'          => 'admin/orders',
-            '/admin/products'        => 'admin/products',
+            '/admin' => 'admin',
+            '/admin/orders' => 'admin/orders',
+            '/admin/products' => 'admin/products',
             '/admin/products/create' => 'admin/products/create',
-            '/admin/categories'      => 'admin/categories',
+            '/admin/categories' => 'admin/categories',
             '/admin/categories/create' => 'admin/categories/create',
-            '/admin/customers'       => 'admin/customers',
-            '/admin/reviews'         => 'admin/reviews',
-            '/admin/returns'         => 'admin/returns',
-            '/admin/reports'         => 'admin/reports',
-            '/admin/roles'           => 'admin/roles',
-            '/admin/roles/create'    => 'admin/roles/create',
-            '/admin/users'           => 'admin/users',
-            '/admin/users/create'    => 'admin/users/create',
-            '/admin/vouchers'        => 'admin/vouchers',
+            '/admin/customers' => 'admin/customers',
+            '/admin/reviews' => 'admin/reviews',
+            '/admin/returns' => 'admin/returns',
+            '/admin/reports' => 'admin/reports',
+            '/admin/roles' => 'admin/roles',
+            '/admin/roles/create' => 'admin/roles/create',
+            '/admin/users' => 'admin/users',
+            '/admin/users/create' => 'admin/users/create',
+            '/admin/vouchers' => 'admin/vouchers',
             '/admin/vouchers/create' => 'admin/vouchers/create',
-            '/admin/news'            => 'admin/news',
-            '/admin/news/create'     => 'admin/news/create',
-            '/admin/goods_receipts'  => 'admin/goods_receipts',
+            '/admin/news' => 'admin/news',
+            '/admin/news/create' => 'admin/news/create',
+            '/admin/goods_receipts' => 'admin/goods_receipts',
             '/admin/goods_receipts/create' => 'admin/goods_receipts/create',
-            '/admin/goods_issues'    => 'admin/goods_issues',
+            '/admin/goods_issues' => 'admin/goods_issues',
             '/admin/goods_issues/create' => 'admin/goods_issues/create',
-            '/admin/qc_inspections'  => 'admin/qc_inspections',
+            '/admin/qc_inspections' => 'admin/qc_inspections',
             '/admin/qc_inspections/create' => 'admin/qc_inspections/create',
-            '/admin/chat'            => 'admin/chat',
+            '/admin/chat' => 'admin/chat',
         ];
 
         foreach ($adminBasePages as $routePath => $slug) {
@@ -252,59 +261,59 @@ class ExportStaticSite extends Command
         // Thu thập các trang Show/Edit trong Admin cho từng bản ghi thực tế
         try {
             // Chi tiết đơn hàng trong Admin
-            foreach (\App\Models\Order::all() as $ord) {
-                $allPages['/admin/orders/' . $ord->id] = ['slug' => 'admin/orders/' . $ord->id, 'user' => $adminUser, 'session' => []];
+            foreach (Order::all() as $ord) {
+                $allPages['/admin/orders/'.$ord->id] = ['slug' => 'admin/orders/'.$ord->id, 'user' => $adminUser, 'session' => []];
             }
 
             // Chỉnh sửa & Chi tiết sản phẩm trong Admin
             foreach (Product::all() as $p) {
-                $allPages['/admin/products/' . $p->id . '/edit'] = ['slug' => 'admin/products/' . $p->id . '/edit', 'user' => $adminUser, 'session' => []];
-                $allPages['/admin/products/' . $p->id] = ['slug' => 'admin/products/' . $p->id, 'user' => $adminUser, 'session' => []];
+                $allPages['/admin/products/'.$p->id.'/edit'] = ['slug' => 'admin/products/'.$p->id.'/edit', 'user' => $adminUser, 'session' => []];
+                $allPages['/admin/products/'.$p->id] = ['slug' => 'admin/products/'.$p->id, 'user' => $adminUser, 'session' => []];
             }
 
             // Chỉnh sửa & Chi tiết danh mục
-            foreach (\App\Models\Category::all() as $cat) {
-                $allPages['/admin/categories/' . $cat->id . '/edit'] = ['slug' => 'admin/categories/' . $cat->id . '/edit', 'user' => $adminUser, 'session' => []];
-                $allPages['/admin/categories/' . $cat->id] = ['slug' => 'admin/categories/' . $cat->id, 'user' => $adminUser, 'session' => []];
+            foreach (Category::all() as $cat) {
+                $allPages['/admin/categories/'.$cat->id.'/edit'] = ['slug' => 'admin/categories/'.$cat->id.'/edit', 'user' => $adminUser, 'session' => []];
+                $allPages['/admin/categories/'.$cat->id] = ['slug' => 'admin/categories/'.$cat->id, 'user' => $adminUser, 'session' => []];
             }
 
             // Chi tiết phiếu nhập kho
-            foreach (\App\Models\GoodsReceipt::all() as $gr) {
-                $allPages['/admin/goods_receipts/' . $gr->id] = ['slug' => 'admin/goods_receipts/' . $gr->id, 'user' => $adminUser, 'session' => []];
+            foreach (GoodsReceipt::all() as $gr) {
+                $allPages['/admin/goods_receipts/'.$gr->id] = ['slug' => 'admin/goods_receipts/'.$gr->id, 'user' => $adminUser, 'session' => []];
             }
 
             // Chi tiết khách hàng
-            foreach (\App\Models\User::where('role', 'customer')->get() as $cust) {
-                $allPages['/admin/customers/' . $cust->id] = ['slug' => 'admin/customers/' . $cust->id, 'user' => $adminUser, 'session' => []];
+            foreach (User::where('role', 'customer')->get() as $cust) {
+                $allPages['/admin/customers/'.$cust->id] = ['slug' => 'admin/customers/'.$cust->id, 'user' => $adminUser, 'session' => []];
             }
 
             // Chỉnh sửa vai trò (Role)
-            foreach (\Spatie\Permission\Models\Role::all() as $role) {
-                $allPages['/admin/roles/' . $role->id . '/edit'] = ['slug' => 'admin/roles/' . $role->id . '/edit', 'user' => $adminUser, 'session' => []];
+            foreach (Role::all() as $role) {
+                $allPages['/admin/roles/'.$role->id.'/edit'] = ['slug' => 'admin/roles/'.$role->id.'/edit', 'user' => $adminUser, 'session' => []];
             }
 
             // Chỉnh sửa tài khoản người dùng
-            foreach (\App\Models\User::all() as $u) {
-                $allPages['/admin/users/' . $u->id . '/edit'] = ['slug' => 'admin/users/' . $u->id . '/edit', 'user' => $adminUser, 'session' => []];
-                $allPages['/admin/users/' . $u->id] = ['slug' => 'admin/users/' . $u->id, 'user' => $adminUser, 'session' => []];
+            foreach (User::all() as $u) {
+                $allPages['/admin/users/'.$u->id.'/edit'] = ['slug' => 'admin/users/'.$u->id.'/edit', 'user' => $adminUser, 'session' => []];
+                $allPages['/admin/users/'.$u->id] = ['slug' => 'admin/users/'.$u->id, 'user' => $adminUser, 'session' => []];
             }
 
             // Chỉnh sửa mã giảm giá
-            foreach (\App\Models\Voucher::all() as $v) {
-                $allPages['/admin/vouchers/' . $v->id . '/edit'] = ['slug' => 'admin/vouchers/' . $v->id . '/edit', 'user' => $adminUser, 'session' => []];
+            foreach (Voucher::all() as $v) {
+                $allPages['/admin/vouchers/'.$v->id.'/edit'] = ['slug' => 'admin/vouchers/'.$v->id.'/edit', 'user' => $adminUser, 'session' => []];
             }
 
             // Chỉnh sửa bài viết tin tức
-            foreach (\App\Models\News::all() as $n) {
-                $allPages['/admin/news/' . $n->id . '/edit'] = ['slug' => 'admin/news/' . $n->id . '/edit', 'user' => $adminUser, 'session' => []];
+            foreach (News::all() as $n) {
+                $allPages['/admin/news/'.$n->id.'/edit'] = ['slug' => 'admin/news/'.$n->id.'/edit', 'user' => $adminUser, 'session' => []];
             }
         } catch (\Throwable $e) {
-            $this->warn("   ! Lỗi thu thập chi tiết CRUD Admin: " . $e->getMessage());
+            $this->warn('   ! Lỗi thu thập chi tiết CRUD Admin: '.$e->getMessage());
         }
 
         // 4. Render từng trang và ghi tệp Dual-Path
-        $this->info("📄 Đang render và chuẩn hóa " . count($allPages) . " trang cho GitHub Pages...");
-        $kernel = app()->make(\Illuminate\Contracts\Http\Kernel::class);
+        $this->info('📄 Đang render và chuẩn hóa '.count($allPages).' trang cho GitHub Pages...');
+        $kernel = app()->make(Kernel::class);
 
         foreach ($allPages as $routePath => $pageConfig) {
             $slug = $pageConfig['slug'];
@@ -320,7 +329,7 @@ class ExportStaticSite extends Command
                     auth()->logout();
                 }
 
-                if (!empty($sessionData)) {
+                if (! empty($sessionData)) {
                     $session = app('session')->driver();
                     $session->setId('static-export-session');
                     $session->start();
@@ -340,20 +349,20 @@ class ExportStaticSite extends Command
                 // Ghi file theo Dual-Path
                 if ($slug === '') {
                     // Trang chủ: index.html
-                    File::put($distDir . '/index.html', $html);
-                    $this->line("   ✓ Rendered: [Home] -> index.html");
+                    File::put($distDir.'/index.html', $html);
+                    $this->line('   ✓ Rendered: [Home] -> index.html');
                 } else {
                     // 1. Dạng thư mục có index.html: vd dist/gioi-thieu/index.html (cho URL .../gioi-thieu/)
-                    $subDir = $distDir . '/' . $slug;
-                    if (!File::exists($subDir)) {
+                    $subDir = $distDir.'/'.$slug;
+                    if (! File::exists($subDir)) {
                         File::makeDirectory($subDir, 0755, true);
                     }
-                    File::put($subDir . '/index.html', $html);
+                    File::put($subDir.'/index.html', $html);
 
                     // 2. Dạng tệp .html đơn lẻ: vd dist/gioi-thieu.html (cho URL .../gioi-thieu)
-                    $singleFile = $distDir . '/' . $slug . '.html';
+                    $singleFile = $distDir.'/'.$slug.'.html';
                     $parentDir = dirname($singleFile);
-                    if (!File::exists($parentDir)) {
+                    if (! File::exists($parentDir)) {
                         File::makeDirectory($parentDir, 0755, true);
                     }
                     File::put($singleFile, $html);
@@ -361,22 +370,24 @@ class ExportStaticSite extends Command
                     $this->line("   ✓ Rendered: {$routePath} -> {$slug}/index.html & {$slug}.html");
                 }
             } catch (\Throwable $e) {
-                $this->error("   ✗ Lỗi khi render {$routePath}: " . $e->getMessage());
+                $this->error("   ✗ Lỗi khi render {$routePath}: ".$e->getMessage());
             }
         }
 
         // Reset auth state sau khi render
         try {
             auth()->logout();
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+        }
 
         // 5. Tạo 404.html chuyên nghiệp cho GitHub Pages
-        $homeUrl = !empty($basePrefix) ? $basePrefix . '/' : '/';
+        $homeUrl = ! empty($basePrefix) ? $basePrefix.'/' : '/';
         $notFoundHtml = $this->generate404Page($homeUrl);
-        File::put($distDir . '/404.html', $notFoundHtml);
-        $this->line("   - Đã tạo 404.html thân thiện cho GitHub Pages");
+        File::put($distDir.'/404.html', $notFoundHtml);
+        $this->line('   - Đã tạo 404.html thân thiện cho GitHub Pages');
 
-        $this->info("🎉 Xuất tĩnh hoàn tất 100%! Đã xử lý triệt để link localhost, hỗ trợ Dual-Path và Demo Mode.");
+        $this->info('🎉 Xuất tĩnh hoàn tất 100%! Đã xử lý triệt để link localhost, hỗ trợ Dual-Path và Demo Mode.');
+
         return Command::SUCCESS;
     }
 
@@ -385,8 +396,8 @@ class ExportStaticSite extends Command
      */
     protected function normalizeHtmlForGitHubPages(string $html, string $basePrefix): string
     {
-        $targetBase = !empty($basePrefix) ? $basePrefix : '';
-        $homeUrl = !empty($targetBase) ? $targetBase . '/' : '/';
+        $targetBase = ! empty($basePrefix) ? $basePrefix : '';
+        $homeUrl = ! empty($targetBase) ? $targetBase.'/' : '/';
 
         // 1. Xóa bỏ hoàn toàn mọi URL tuyệt đối localhost (kể cả escape slashes trong JS)
         $localhostPatterns = [
@@ -414,43 +425,43 @@ class ExportStaticSite extends Command
             $isEscaped = str_contains($lh, '\/');
             $replacement = $isEscaped ? $escapedTargetBase : $targetBase;
             $slash = $isEscaped ? '\/' : '/';
-            $html = str_replace($lh . $slash, $replacement . $slash, $html);
+            $html = str_replace($lh.$slash, $replacement.$slash, $html);
             $html = str_replace($lh, $replacement, $html);
         }
 
         // 2. Xử lý các liên kết tương đối bắt đầu bằng /
-        if (!empty($targetBase)) {
+        if (! empty($targetBase)) {
             // Thay thế liên kết assets
-            $html = preg_replace('/href="\/(build\/[^"]*)"/', 'href="' . $targetBase . '/$1"', $html);
-            $html = preg_replace('/src="\/(build\/[^"]*)"/', 'src="' . $targetBase . '/$1"', $html);
-            $html = preg_replace('/src="\/(uploads\/[^"]*)"/', 'src="' . $targetBase . '/$1"', $html);
-            $html = preg_replace('/href="\/(uploads\/[^"]*)"/', 'href="' . $targetBase . '/$1"', $html);
-            $html = preg_replace('/src="\/(images\/[^"]*)"/', 'src="' . $targetBase . '/$1"', $html);
-            $html = str_replace('href="/favicon.ico"', 'href="' . $targetBase . '/favicon.ico"', $html);
+            $html = preg_replace('/href="\/(build\/[^"]*)"/', 'href="'.$targetBase.'/$1"', $html);
+            $html = preg_replace('/src="\/(build\/[^"]*)"/', 'src="'.$targetBase.'/$1"', $html);
+            $html = preg_replace('/src="\/(uploads\/[^"]*)"/', 'src="'.$targetBase.'/$1"', $html);
+            $html = preg_replace('/href="\/(uploads\/[^"]*)"/', 'href="'.$targetBase.'/$1"', $html);
+            $html = preg_replace('/src="\/(images\/[^"]*)"/', 'src="'.$targetBase.'/$1"', $html);
+            $html = str_replace('href="/favicon.ico"', 'href="'.$targetBase.'/favicon.ico"', $html);
 
             // Thay thế các liên kết trang nội bộ
             $internalRoutes = [
                 'san-pham', 'products', 'gioi-thieu', 'about',
                 'ho-tro', 'support', 'contact', 'tin-tuc', 'news',
-                'product', 'cart', 'checkout', 'login', 'register', 'forgot-password', 'orders', 'wishlist', 'profile', 'admin', 'email', 'reset-password'
+                'product', 'cart', 'checkout', 'login', 'register', 'forgot-password', 'orders', 'wishlist', 'profile', 'admin', 'email', 'reset-password',
             ];
 
             foreach ($internalRoutes as $r) {
                 // Thay href="/san-pham" -> href="/lensStore/san-pham/"
-                $html = preg_replace('/href="\/' . $r . '(\/[^"]*|\?|#[^"]*|)"/', 'href="' . $targetBase . '/' . $r . '$1"', $html);
-                $html = preg_replace('/action="\/' . $r . '(\/[^"]*|\?|#[^"]*|)"/', 'action="' . $targetBase . '/' . $r . '$1"', $html);
+                $html = preg_replace('/href="\/'.$r.'(\/[^"]*|\?|#[^"]*|)"/', 'href="'.$targetBase.'/'.$r.'$1"', $html);
+                $html = preg_replace('/action="\/'.$r.'(\/[^"]*|\?|#[^"]*|)"/', 'action="'.$targetBase.'/'.$r.'$1"', $html);
             }
 
             // Thay link trang chủ href="/" -> href="/lensStore/"
-            $html = preg_replace('/href="\/(#|\?|)"/', 'href="' . $targetBase . '/$1"', $html);
+            $html = preg_replace('/href="\/(#|\?|)"/', 'href="'.$targetBase.'/$1"', $html);
         }
 
         // 3. Đảm bảo các link thư mục trên GitHub Pages có trailing slash để tải index.html đúng
-        $html = preg_replace('/href="(' . preg_quote($targetBase, '/') . '\/(?:gioi-thieu|about|ho-tro|support|contact|san-pham|products|tin-tuc|news|login|register|forgot-password|cart|checkout|wishlist|orders|profile|email|reset-password|admin(?:\/[a-zA-Z0-9_\-]+)*))"/', 'href="$1/"', $html);
+        $html = preg_replace('/href="('.preg_quote($targetBase, '/').'\/(?:gioi-thieu|about|ho-tro|support|contact|san-pham|products|tin-tuc|news|login|register|forgot-password|cart|checkout|wishlist|orders|profile|email|reset-password|admin(?:\/[a-zA-Z0-9_\-]+)*))"/', 'href="$1/"', $html);
 
         // 4. Nhúng Bộ điều khiển tương tác Client-Side tĩnh trước </body>
         $staticScript = $this->getStaticEnhancementsScript($basePrefix);
-        $html = str_replace('</body>', $staticScript . '</body>', $html);
+        $html = str_replace('</body>', $staticScript.'</body>', $html);
 
         return $html;
     }
@@ -460,8 +471,8 @@ class ExportStaticSite extends Command
      */
     protected function getStaticEnhancementsScript(string $basePrefix): string
     {
-        $targetBase = !empty($basePrefix) ? $basePrefix : '';
-        $homeUrl = !empty($targetBase) ? $targetBase . '/' : '/';
+        $targetBase = ! empty($basePrefix) ? $basePrefix : '';
+        $homeUrl = ! empty($targetBase) ? $targetBase.'/' : '/';
 
         return <<<HTML
 <!-- LensStore Client-Side Static Interactive Engine -->
@@ -773,9 +784,6 @@ class ExportStaticSite extends Command
 </script>
 HTML;
     }
-
-
-
 
     /**
      * Tạo trang 404.html thân thiện chuẩn SEO cho GitHub Pages.

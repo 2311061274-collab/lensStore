@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\InventoryTransaction;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
@@ -21,9 +22,9 @@ class ProductController extends Controller
             $search = trim($request->input('search'));
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%")
-                  ->orWhere('mount', 'like', "%{$search}%")
-                  ->orWhere('focal_length', 'like', "%{$search}%");
+                    ->orWhere('sku', 'like', "%{$search}%")
+                    ->orWhere('mount', 'like', "%{$search}%")
+                    ->orWhere('focal_length', 'like', "%{$search}%");
             });
         }
 
@@ -34,12 +35,26 @@ class ProductController extends Controller
 
         // Lọc theo Ngàm
         if ($request->filled('mount')) {
-            $query->where('mount', 'like', '%' . $request->input('mount') . '%');
+            $query->where('mount', 'like', '%'.$request->input('mount').'%');
         }
 
         // Lọc theo Thương hiệu
         if ($request->filled('brand')) {
-            $query->where('brand', 'like', '%' . $request->input('brand') . '%');
+            $query->where('brand', 'like', '%'.$request->input('brand').'%');
+        }
+
+        // Lọc theo tình trạng tồn kho (Tích hợp liên kết từ Dashboard)
+        if ($request->filled('stock_status')) {
+            $stockStatus = $request->input('stock_status');
+            if ($stockStatus === 'out_of_stock') {
+                $query->where('stock', '<=', 0);
+            } elseif ($stockStatus === 'low') {
+                $query->where('stock', '>', 0)->where('stock', '<', 3);
+            } elseif ($stockStatus === 'alert') {
+                $query->where('stock', '<', 3);
+            } elseif ($stockStatus === 'in_stock') {
+                $query->where('stock', '>=', 3);
+            }
         }
 
         // Sắp xếp
@@ -76,6 +91,7 @@ class ProductController extends Controller
     public function create()
     {
         $categories = Category::all();
+
         return view('products.create', compact('categories'));
     }
 
@@ -87,7 +103,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
-            'sku' => 'nullable|string|max:100',
+            'sku' => 'nullable|string|max:100|unique:products,sku',
             'focal_length' => 'nullable|string|max:100',
             'aperture' => 'nullable|string|max:100',
             'mount' => 'nullable|string|max:100',
@@ -100,6 +116,7 @@ class ProductController extends Controller
             'name.required' => 'Vui lòng nhập tên ống kính máy ảnh.',
             'category_id.required' => 'Vui lòng chọn danh mục ống kính.',
             'category_id.exists' => 'Danh mục đã chọn không hợp lệ.',
+            'sku.unique' => 'Mã SKU này đã tồn tại trên hệ thống.',
             'price.required' => 'Vui lòng nhập giá bán.',
             'price.numeric' => 'Giá bán phải là chữ số hợp lệ.',
             'image_file.image' => 'Tệp tải lên phải là hình ảnh (jpg, png, webp, gif).',
@@ -111,17 +128,28 @@ class ProductController extends Controller
         // Xử lý upload ảnh tệp tin
         if ($request->hasFile('image_file')) {
             $file = $request->file('image_file');
-            $fileName = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $extension = strtolower($file->getClientOriginalExtension());
+            $safeExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+            if (! in_array($extension, $safeExtensions)) {
+                return back()->withErrors(['image_file' => 'Định dạng ảnh không được hỗ trợ.'])->withInput();
+            }
+
+            $fileName = time().'_'.uniqid().'.'.$extension;
             $destinationPath = public_path('uploads/products');
 
-            if (!File::isDirectory($destinationPath)) {
-                File::makeDirectory($destinationPath, 0777, true, true);
+            if (! File::isDirectory($destinationPath)) {
+                File::makeDirectory($destinationPath, 0755, true, true);
             }
 
             $file->move($destinationPath, $fileName);
-            $imagePath = 'uploads/products/' . $fileName;
+            $imagePath = 'uploads/products/'.$fileName;
         } elseif ($request->filled('image_url')) {
-            $imagePath = trim($request->input('image_url'));
+            $rawUrl = trim($request->input('image_url'));
+            $parsed = parse_url($rawUrl);
+            if (! isset($parsed['scheme']) || ! in_array(strtolower($parsed['scheme']), ['http', 'https'])) {
+                return back()->withErrors(['image_url' => 'URL hình ảnh phải có giao thức http:// hoặc https:// hợp lệ.'])->withInput();
+            }
+            $imagePath = $rawUrl;
         }
 
         $productData = [
@@ -132,7 +160,7 @@ class ProductController extends Controller
             'aperture' => $validated['aperture'] ?? null,
             'mount' => $validated['mount'] ?? null,
             'price' => $validated['price'],
-            'stock' => 0, // Tồn kho ban đầu luôn là 0, chờ nhập kho
+            'stock' => 0, // Tồn kho ban đầu luôn là 0, chỉ tăng thông qua Phiếu Nhập Kho (Goods Receipt)
             'description' => $validated['description'] ?? null,
             'image' => $imagePath,
             'status' => $validated['status'],
@@ -141,7 +169,7 @@ class ProductController extends Controller
         Product::create($productData);
 
         return redirect()->route('admin.products.index')
-                         ->with('success', 'Thêm mới ống kính "' . $validated['name'] . '" thành công!');
+            ->with('success', 'Thêm mới ống kính "'.$validated['name'].'" thành công! Tồn kho hiện tại là 0, vui lòng tạo Phiếu Nhập Kho để nạp số lượng.');
     }
 
     /**
@@ -164,6 +192,7 @@ class ProductController extends Controller
     public function edit(Product $product)
     {
         $categories = Category::all();
+
         return view('products.edit', compact('product', 'categories'));
     }
 
@@ -175,12 +204,11 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'category_id' => 'required|exists:categories,id',
-            'sku' => 'nullable|string|max:100',
+            'sku' => 'nullable|string|max:100|unique:products,sku,'.$product->id,
             'focal_length' => 'nullable|string|max:100',
             'aperture' => 'nullable|string|max:100',
             'mount' => 'nullable|string|max:100',
             'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
             'description' => 'nullable|string',
             'gallery_images' => 'nullable|string',
             'sample_images' => 'nullable|string',
@@ -191,10 +219,9 @@ class ProductController extends Controller
             'name.required' => 'Vui lòng nhập tên ống kính máy ảnh.',
             'category_id.required' => 'Vui lòng chọn danh mục ống kính.',
             'category_id.exists' => 'Danh mục đã chọn không hợp lệ.',
+            'sku.unique' => 'Mã SKU này đã tồn tại trên sản phẩm khác.',
             'price.required' => 'Vui lòng nhập giá bán.',
             'price.numeric' => 'Giá bán phải là chữ số hợp lệ.',
-            'stock.required' => 'Vui lòng nhập số lượng tồn kho.',
-            'stock.integer' => 'Số lượng tồn kho phải là số nguyên.',
             'image_file.image' => 'Tệp tải lên phải là hình ảnh.',
         ]);
 
@@ -203,27 +230,34 @@ class ProductController extends Controller
         // Nếu người dùng tải lên ảnh mới
         if ($request->hasFile('image_file')) {
             // Xóa ảnh cũ nếu nằm trong thư mục uploads
-            if ($product->image && !str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
+            if ($product->image && ! str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
                 File::delete(public_path($product->image));
             }
 
             $file = $request->file('image_file');
-            $fileName = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $extension = strtolower($file->getClientOriginalExtension());
+            $fileName = time().'_'.uniqid().'.'.$extension;
             $destinationPath = public_path('uploads/products');
 
-            if (!File::isDirectory($destinationPath)) {
-                File::makeDirectory($destinationPath, 0777, true, true);
+            if (! File::isDirectory($destinationPath)) {
+                File::makeDirectory($destinationPath, 0755, true, true);
             }
 
             $file->move($destinationPath, $fileName);
-            $imagePath = 'uploads/products/' . $fileName;
+            $imagePath = 'uploads/products/'.$fileName;
         } elseif ($request->filled('image_url')) {
-            if ($product->image && !str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
+            $rawUrl = trim($request->input('image_url'));
+            $parsed = parse_url($rawUrl);
+            if (! isset($parsed['scheme']) || ! in_array(strtolower($parsed['scheme']), ['http', 'https'])) {
+                return back()->withErrors(['image_url' => 'URL hình ảnh phải có giao thức http:// hoặc https:// hợp lệ.'])->withInput();
+            }
+            if ($product->image && ! str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
                 File::delete(public_path($product->image));
             }
-            $imagePath = trim($request->input('image_url'));
+            $imagePath = $rawUrl;
         }
 
+        // Không cho phép sửa tồn kho trực tiếp từ form edit (Bảo đảm nguyên tắc WMS/Mini-ERP)
         $productData = [
             'name' => $validated['name'],
             'category_id' => $validated['category_id'],
@@ -232,7 +266,6 @@ class ProductController extends Controller
             'aperture' => $validated['aperture'] ?? null,
             'mount' => $validated['mount'] ?? null,
             'price' => $validated['price'],
-            'stock' => $validated['stock'],
             'description' => $validated['description'] ?? null,
             'image' => $imagePath,
             'status' => $validated['status'],
@@ -248,15 +281,15 @@ class ProductController extends Controller
             foreach ($galleryUrls as $i => $url) {
                 $cap = $galleryCaps[$i] ?? '';
                 $finalUrl = $url;
-                
+
                 if (isset($galleryFiles[$i])) {
                     $file = $galleryFiles[$i];
-                    $fileName = time() . '_g_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                    $fileName = time().'_g_'.uniqid().'.'.$file->getClientOriginalExtension();
                     $file->move(public_path('uploads/products'), $fileName);
-                    $finalUrl = 'uploads/products/' . $fileName;
+                    $finalUrl = 'uploads/products/'.$fileName;
                 }
-                
-                if (!empty($finalUrl)) {
+
+                if (! empty($finalUrl)) {
                     $gallery[] = ['url' => $finalUrl, 'cap' => $cap];
                 }
             }
@@ -275,15 +308,15 @@ class ProductController extends Controller
                 $tag = $sampleTags[$i] ?? '';
                 $text = $sampleTexts[$i] ?? '';
                 $finalUrl = $url;
-                
+
                 if (isset($sampleFiles[$i])) {
                     $file = $sampleFiles[$i];
-                    $fileName = time() . '_s_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                    $fileName = time().'_s_'.uniqid().'.'.$file->getClientOriginalExtension();
                     $file->move(public_path('uploads/products'), $fileName);
-                    $finalUrl = 'uploads/products/' . $fileName;
+                    $finalUrl = 'uploads/products/'.$fileName;
                 }
-                
-                if (!empty($finalUrl)) {
+
+                if (! empty($finalUrl)) {
                     $samples[] = ['url' => $finalUrl, 'tag' => $tag, 'text' => $text];
                 }
             }
@@ -293,25 +326,33 @@ class ProductController extends Controller
         $product->update($productData);
 
         return redirect()->route('admin.products.index')
-                         ->with('success', 'Cập nhật ống kính "' . $product->name . '" thành công!');
+            ->with('success', 'Cập nhật ống kính "'.$product->name.'" thành công!');
     }
 
     /**
-     * Xóa ống kính khỏi cơ sở dữ liệu
+     * Xóa ống kính khỏi cơ sở dữ liệu (Chặn xóa cứng nếu đã có giao dịch)
      */
     public function destroy(Product $product)
     {
         $name = $product->name;
 
+        // Kiểm tra xem sản phẩm đã phát sinh giao dịch đơn hàng hoặc biến động thẻ kho chưa
+        $hasOrders = $product->orderItems()->exists();
+        $hasTransactions = InventoryTransaction::where('product_id', $product->id)->exists();
+
+        if ($hasOrders || $hasTransactions) {
+            return back()->with('error', "Không thể xóa ống kính '{$name}' vì đã phát sinh lịch sử đơn hàng hoặc thẻ kho. Hãy chuyển trạng thái sản phẩm sang 'Hết hàng' (Ngừng kinh doanh) để bảo vệ toàn vẹn dữ liệu kế toán.");
+        }
+
         // Xóa ảnh local nếu có
-        if ($product->image && !str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
+        if ($product->image && ! str_starts_with($product->image, 'http') && File::exists(public_path($product->image))) {
             File::delete(public_path($product->image));
         }
 
         $product->delete();
 
         return redirect()->route('admin.products.index')
-                         ->with('success', "Đã xóa ống kính '{$name}' thành công!");
+            ->with('success', "Đã xóa ống kính '{$name}' thành công!");
     }
 
     /**
@@ -337,6 +378,6 @@ class ProductController extends Controller
         }
 
         return redirect()->route('admin.products.index')
-                         ->with('success', 'Đã cập nhật hàng loạt sản phẩm thương hiệu "' . $validated['brand'] . '".');
+            ->with('success', 'Đã cập nhật hàng loạt sản phẩm thương hiệu "'.$validated['brand'].'".');
     }
 }

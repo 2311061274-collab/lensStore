@@ -14,14 +14,14 @@ class WishlistController extends Controller
             ->with('product')
             ->latest()
             ->get();
-            
+
         return view('storefront.wishlist', compact('wishlists'));
     }
 
     public function toggle(Request $request)
     {
         $request->validate([
-            'product_id' => 'required|exists:products,id'
+            'product_id' => 'required|exists:products,id',
         ]);
 
         $userId = Auth::id();
@@ -33,12 +33,14 @@ class WishlistController extends Controller
 
         if ($wishlist) {
             $wishlist->delete();
+
             return response()->json(['status' => 'removed', 'message' => 'Đã bỏ yêu thích sản phẩm.']);
         } else {
             Wishlist::create([
                 'user_id' => $userId,
-                'product_id' => $productId
+                'product_id' => $productId,
             ]);
+
             return response()->json(['status' => 'added', 'message' => 'Đã thêm sản phẩm vào danh sách yêu thích.']);
         }
     }

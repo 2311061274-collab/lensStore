@@ -5,27 +5,32 @@ namespace App\Services;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class MomoService
 {
-    private string $endpoint    = '';
+    private string $endpoint = '';
+
     private string $partnerCode = '';
-    private string $accessKey   = '';
-    private string $secretKey   = '';
-    private bool   $verifySSL   = false;
+
+    private string $accessKey = '';
+
+    private string $secretKey = '';
+
+    private bool $verifySSL = false;
+
     private string $redirectUrl = '';
-    private string $ipnUrl      = '';
+
+    private string $ipnUrl = '';
 
     public function __construct()
     {
-        $this->endpoint     = (string) (config('services.momo.endpoint') ?? 'https://test-payment.momo.vn/v2/gateway/api/create');
-        $this->partnerCode  = (string) (config('services.momo.partner_code') ?? '');
-        $this->accessKey    = (string) (config('services.momo.access_key') ?? '');
-        $this->secretKey    = (string) (config('services.momo.secret_key') ?? '');
-        $this->verifySSL    = (bool) config('services.momo.verify_ssl', false);
-        $this->redirectUrl  = (string) (config('services.momo.redirect_url') ?? '');
-        $this->ipnUrl       = (string) (config('services.momo.ipn_url') ?? '');
+        $this->endpoint = (string) (config('services.momo.endpoint') ?? 'https://test-payment.momo.vn/v2/gateway/api/create');
+        $this->partnerCode = (string) (config('services.momo.partner_code') ?? '');
+        $this->accessKey = (string) (config('services.momo.access_key') ?? '');
+        $this->secretKey = (string) (config('services.momo.secret_key') ?? '');
+        $this->verifySSL = (bool) config('services.momo.verify_ssl', false);
+        $this->redirectUrl = (string) (config('services.momo.redirect_url') ?? '');
+        $this->ipnUrl = (string) (config('services.momo.ipn_url') ?? '');
     }
 
     /**
@@ -33,7 +38,7 @@ class MomoService
      */
     public function isConfigured(): bool
     {
-        return !empty($this->partnerCode) && !empty($this->secretKey);
+        return ! empty($this->partnerCode) && ! empty($this->secretKey);
     }
 
     /**
@@ -41,52 +46,52 @@ class MomoService
      */
     public function createPayment(Order $order): array
     {
-        if (!$this->isConfigured()) {
+        if (! $this->isConfigured()) {
             return ['success' => false, 'message' => 'Cổng thanh toán MoMo chưa được cấu hình thông tin kết nối.'];
         }
-        $requestId    = $this->partnerCode . '_' . $order->id . '_' . time();
-        $orderId      = $this->partnerCode . '_ORDER_' . $order->id . '_' . time();
-        $orderInfo    = 'Thanh toán đơn hàng LensStore #' . $order->id;
-        $amount       = (int) round($order->total);
-        $requestType  = 'captureWallet'; // Dùng QR / App MoMo (thay vì thẻ ATM)
-        $extraData    = base64_encode(json_encode(['order_id' => $order->id]));
+        $requestId = $this->partnerCode.'_'.$order->id.'_'.time();
+        $orderId = $this->partnerCode.'_ORDER_'.$order->id.'_'.time();
+        $orderInfo = 'Thanh toán đơn hàng LensStore #'.$order->id;
+        $amount = (int) round($order->total);
+        $requestType = 'captureWallet'; // Dùng QR / App MoMo (thay vì thẻ ATM)
+        $extraData = base64_encode(json_encode(['order_id' => $order->id]));
 
         $rawSignature = "accessKey={$this->accessKey}"
-            . "&amount={$amount}"
-            . "&extraData={$extraData}"
-            . "&ipnUrl={$this->ipnUrl}"
-            . "&orderId={$orderId}"
-            . "&orderInfo={$orderInfo}"
-            . "&partnerCode={$this->partnerCode}"
-            . "&redirectUrl={$this->redirectUrl}"
-            . "&requestId={$requestId}"
-            . "&requestType={$requestType}";
+            ."&amount={$amount}"
+            ."&extraData={$extraData}"
+            ."&ipnUrl={$this->ipnUrl}"
+            ."&orderId={$orderId}"
+            ."&orderInfo={$orderInfo}"
+            ."&partnerCode={$this->partnerCode}"
+            ."&redirectUrl={$this->redirectUrl}"
+            ."&requestId={$requestId}"
+            ."&requestType={$requestType}";
 
         $signature = hash_hmac('sha256', $rawSignature, $this->secretKey);
 
         $payload = [
             'partnerCode' => $this->partnerCode,
-            'accessKey'   => $this->accessKey,
-            'requestId'   => $requestId,
-            'amount'      => $amount,
-            'orderId'     => $orderId,
-            'orderInfo'   => $orderInfo,
+            'accessKey' => $this->accessKey,
+            'requestId' => $requestId,
+            'amount' => $amount,
+            'orderId' => $orderId,
+            'orderInfo' => $orderInfo,
             'redirectUrl' => $this->redirectUrl,
-            'ipnUrl'      => $this->ipnUrl,
-            'lang'        => 'vi',
-            'extraData'   => $extraData,
+            'ipnUrl' => $this->ipnUrl,
+            'lang' => 'vi',
+            'extraData' => $extraData,
             'requestType' => $requestType,
-            'signature'   => $signature,
+            'signature' => $signature,
         ];
 
         // Lưu giao dịch chờ thanh toán
         PaymentTransaction::create([
-            'order_id'         => $order->id,
-            'gateway'          => 'momo',
+            'order_id' => $order->id,
+            'gateway' => 'momo',
             'gateway_order_id' => $orderId,
-            'amount'           => $amount,
-            'status'           => 'pending',
-            'request_payload'  => $payload,
+            'amount' => $amount,
+            'status' => 'pending',
+            'request_payload' => $payload,
         ]);
 
         $response = $this->post($this->endpoint, $payload);
@@ -109,28 +114,30 @@ class MomoService
      */
     public function handleCallback(array $data): bool
     {
-        if (!$this->isValidSignature($data)) {
+        if (! $this->isValidSignature($data)) {
             Log::warning('MoMo invalid signature', $data);
+
             return false;
         }
 
         $transaction = PaymentTransaction::where('gateway_order_id', $data['orderId'])->first();
-        if (!$transaction) {
+        if (! $transaction) {
             Log::warning('MoMo transaction not found', ['orderId' => $data['orderId']]);
+
             return false;
         }
 
         $transaction->update([
-            'transaction_id'   => $data['transId'] ?? null,
-            'result_code'      => $data['resultCode'],
-            'message'          => $data['message'] ?? null,
+            'transaction_id' => $data['transId'] ?? null,
+            'result_code' => $data['resultCode'],
+            'message' => $data['message'] ?? null,
             'response_payload' => $data,
         ]);
 
         if ((int) $data['resultCode'] === 0) {
             // Thành công
             $transaction->update([
-                'status'  => 'paid',
+                'status' => 'paid',
                 'paid_at' => now(),
             ]);
             $transaction->order->update(['payment_status' => 'paid']);
@@ -140,6 +147,7 @@ class MomoService
 
         // Thất bại
         $transaction->update(['status' => 'failed']);
+
         return false;
     }
 
@@ -149,18 +157,18 @@ class MomoService
     public function isValidSignature(array $data): bool
     {
         $rawSignature = "accessKey={$this->accessKey}"
-            . "&amount={$data['amount']}"
-            . "&extraData={$data['extraData']}"
-            . "&message={$data['message']}"
-            . "&orderId={$data['orderId']}"
-            . "&orderInfo={$data['orderInfo']}"
-            . "&orderType={$data['orderType']}"
-            . "&partnerCode={$data['partnerCode']}"
-            . "&payType={$data['payType']}"
-            . "&requestId={$data['requestId']}"
-            . "&responseTime={$data['responseTime']}"
-            . "&resultCode={$data['resultCode']}"
-            . "&transId={$data['transId']}";
+            ."&amount={$data['amount']}"
+            ."&extraData={$data['extraData']}"
+            ."&message={$data['message']}"
+            ."&orderId={$data['orderId']}"
+            ."&orderInfo={$data['orderInfo']}"
+            ."&orderType={$data['orderType']}"
+            ."&partnerCode={$data['partnerCode']}"
+            ."&payType={$data['payType']}"
+            ."&requestId={$data['requestId']}"
+            ."&responseTime={$data['responseTime']}"
+            ."&resultCode={$data['resultCode']}"
+            ."&transId={$data['transId']}";
 
         $expected = hash_hmac('sha256', $rawSignature, $this->secretKey);
 
@@ -175,23 +183,24 @@ class MomoService
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
                 'Accept: application/json',
             ],
             CURLOPT_SSL_VERIFYPEER => $this->verifySSL,
             CURLOPT_SSL_VERIFYHOST => $this->verifySSL ? 2 : 0,
-            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_TIMEOUT => 30,
         ]);
 
         $result = curl_exec($ch);
-        $err    = curl_error($ch);
+        $err = curl_error($ch);
         curl_close($ch);
 
         if ($err) {
-            Log::error('MoMo cURL error: ' . $err);
+            Log::error('MoMo cURL error: '.$err);
+
             return ['error' => $err];
         }
 

@@ -23,7 +23,7 @@ class SendOtpVerification extends Notification
             ->subject('🔐 Mã xác thực tài khoản LensStore của bạn')
             ->view('emails.otp-verification', [
                 'user' => $notifiable,
-                'otp'  => $this->otp,
+                'otp' => $this->otp,
             ]);
     }
 }

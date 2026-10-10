@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Carbon;
 
 class ForgotPasswordController extends Controller
 {
@@ -20,18 +20,18 @@ class ForgotPasswordController extends Controller
     public function sendResetOtp(Request $request)
     {
         $request->validate([
-            'email' => 'required|email|exists:users,email'
+            'email' => 'required|email|exists:users,email',
         ], [
             'email.required' => 'Vui lòng nhập email.',
             'email.email' => 'Email không đúng định dạng.',
-            'email.exists' => 'Email không tồn tại trong hệ thống.'
+            'email.exists' => 'Email không tồn tại trong hệ thống.',
         ]);
 
         $user = User::where('email', $request->email)->first();
 
         // Sinh OTP
         $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        
+
         $request->session()->put('reset_password_otp', $otp);
         $request->session()->put('reset_password_email', $user->email);
         $request->session()->put('reset_password_expires_at', Carbon::now()->addMinutes(15));
@@ -39,19 +39,20 @@ class ForgotPasswordController extends Controller
         // Gửi email
         Mail::send('emails.forgot-password-otp', ['user' => $user, 'otp' => $otp], function ($message) use ($user) {
             $message->to($user->email)
-                    ->subject('🔐 Mã xác thực khôi phục mật khẩu LensStore');
+                ->subject('🔐 Mã xác thực khôi phục mật khẩu LensStore');
         });
 
         return redirect()->route('password.verify.form')
-                         ->with('success', 'Mã xác thực khôi phục mật khẩu đã được gửi đến email của bạn.');
+            ->with('success', 'Mã xác thực khôi phục mật khẩu đã được gửi đến email của bạn.');
     }
 
     // Hiển thị form nhập OTP
     public function showVerifyOtpForm(Request $request)
     {
-        if (!$request->session()->has('reset_password_email')) {
+        if (! $request->session()->has('reset_password_email')) {
             return redirect()->route('password.request');
         }
+
         return view('auth.passwords.verify-otp');
     }
 
@@ -59,16 +60,16 @@ class ForgotPasswordController extends Controller
     public function verifyOtp(Request $request)
     {
         $request->validate([
-            'otp' => 'required|string|size:6'
+            'otp' => 'required|string|size:6',
         ], [
             'otp.required' => 'Vui lòng nhập mã xác thực.',
-            'otp.size' => 'Mã xác thực phải có đúng 6 số.'
+            'otp.size' => 'Mã xác thực phải có đúng 6 số.',
         ]);
 
         $storedOtp = $request->session()->get('reset_password_otp');
         $expiresAt = $request->session()->get('reset_password_expires_at');
 
-        if (!$storedOtp) {
+        if (! $storedOtp) {
             return redirect()->route('password.request')->withErrors(['email' => 'Phiên làm việc đã hết hạn. Vui lòng yêu cầu lại.']);
         }
 
@@ -82,35 +83,36 @@ class ForgotPasswordController extends Controller
 
         // OTP đúng -> Cho phép đổi mật khẩu
         $request->session()->put('reset_password_verified', true);
-        
+
         return redirect()->route('password.reset.form');
     }
 
     // Hiển thị form đặt lại mật khẩu
     public function showResetForm(Request $request)
     {
-        if (!$request->session()->get('reset_password_verified')) {
+        if (! $request->session()->get('reset_password_verified')) {
             return redirect()->route('password.request');
         }
-        
+
         $email = $request->session()->get('reset_password_email');
+
         return view('auth.passwords.reset', compact('email'));
     }
 
     // Xử lý đổi mật khẩu
     public function resetPassword(Request $request)
     {
-        if (!$request->session()->get('reset_password_verified')) {
+        if (! $request->session()->get('reset_password_verified')) {
             return redirect()->route('password.request');
         }
 
         $request->validate([
             'email' => 'required|email|exists:users,email',
-            'password' => 'required|string|min:6|confirmed'
+            'password' => 'required|string|min:6|confirmed',
         ], [
             'password.required' => 'Vui lòng nhập mật khẩu mới.',
             'password.min' => 'Mật khẩu phải có ít nhất 6 ký tự.',
-            'password.confirmed' => 'Xác nhận mật khẩu không khớp.'
+            'password.confirmed' => 'Xác nhận mật khẩu không khớp.',
         ]);
 
         $emailSession = $request->session()->get('reset_password_email');

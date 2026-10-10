@@ -20,6 +20,17 @@
         <div style="margin-top: 1rem; font-size: 0.85rem; color: var(--danger);">
             <strong>* Lý do khách trả:</strong> {{ $returnRequest->reason }}
         </div>
+        @if($returnRequest->image)
+        <div style="margin-top: 1rem; display: flex; align-items: center; gap: 12px; padding: 0.75rem; background: #fff; border-radius: 8px; border: 1px solid var(--line);">
+            <img src="{{ $returnRequest->image_url }}" alt="Bằng chứng khách gửi" style="width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line-strong);">
+            <div>
+                <div style="font-size: 0.82rem; font-weight: 700; color: var(--ink);">Ảnh bằng chứng khách gửi kèm yêu cầu</div>
+                <a href="{{ $returnRequest->image_url }}" target="_blank" style="font-size: 0.78rem; color: var(--primary); text-decoration: underline;">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở ảnh kích thước đầy đủ
+                </a>
+            </div>
+        </div>
+        @endif
     </div>
 
     <form action="{{ route('admin.qc_inspections.store') }}" method="POST">

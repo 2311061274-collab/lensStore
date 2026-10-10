@@ -67,6 +67,9 @@
             flex-direction: column;
             position: fixed;
             inset: 0 auto 0 0;
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
             z-index: 50;
             border-right: 1px solid rgba(255,255,255,.05);
         }
@@ -77,6 +80,13 @@
             align-items: center;
             gap: .85rem;
             border-bottom: 1px solid rgba(255,255,255,.06);
+            flex-shrink: 0;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        .sidebar-brand:hover {
+            opacity: 0.95;
         }
 
         .brand-mark {
@@ -87,9 +97,10 @@
             display: grid;
             place-items: center;
             color: #fff;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             box-shadow: 0 4px 12px rgba(79,70,229,.35);
             animation: brandPulse 4s ease-in-out infinite;
+            flex-shrink: 0;
         }
 
         @keyframes brandPulse {
@@ -122,8 +133,30 @@
 
         .sidebar-nav {
             padding: .9rem .75rem;
-            flex: 1;
+            flex: 1 1 auto;
+            min-height: 0;
             overflow-y: auto;
+            overflow-x: hidden;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+        }
+
+        .sidebar-nav::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .sidebar-nav::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.18);
+            border-radius: 999px;
+        }
+
+        .sidebar-nav::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.35);
         }
 
         .nav-section {
@@ -182,6 +215,7 @@
         }
 
         .sidebar-footer {
+            flex-shrink: 0;
             padding: 1rem 1.1rem 1.25rem;
             border-top: 1px solid rgba(255,255,255,.06);
             background: rgba(0,0,0,.15);
@@ -778,13 +812,13 @@
         $pendingReturns = \App\Models\ReturnRequest::where('status', 'pending')->count();
     @endphp
     <aside class="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-mark"><i class="fa-solid fa-aperture"></i></div>
+        <a href="{{ route('admin.dashboard') }}" class="sidebar-brand">
+            <div class="brand-mark"><i class="fa-solid fa-camera-retro"></i></div>
             <div class="brand-text">
                 <strong>LensStore</strong>
                 <small>Admin Panel</small>
             </div>
-        </div>
+        </a>
         <nav class="sidebar-nav">
             <div class="nav-section">Tổng quan</div>
             @can('view_dashboard')

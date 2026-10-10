@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\Voucher;
+use Illuminate\Http\Request;
 
 class VoucherApiController extends Controller
 {
@@ -12,7 +12,7 @@ class VoucherApiController extends Controller
     {
         $request->validate([
             'code' => 'required|string',
-            'subtotal' => 'required|numeric|min:0'
+            'subtotal' => 'required|numeric|min:0',
         ]);
 
         $code = strtoupper(trim($request->code));
@@ -20,22 +20,22 @@ class VoucherApiController extends Controller
 
         $voucher = Voucher::where('code', $code)->first();
 
-        if (!$voucher) {
+        if (! $voucher) {
             return response()->json([
                 'success' => false,
-                'message' => 'Mã giảm giá không tồn tại.'
+                'message' => 'Mã giảm giá không tồn tại.',
             ]);
         }
 
-        if (!$voucher->isValidForOrder($subtotal)) {
+        if (! $voucher->isValidForOrder($subtotal)) {
             $msg = 'Mã giảm giá không hợp lệ hoặc đã hết hạn.';
             if ($voucher->min_order_value > 0 && $subtotal < $voucher->min_order_value) {
-                $msg = 'Đơn hàng chưa đạt giá trị tối thiểu ' . number_format($voucher->min_order_value, 0, ',', '.') . 'đ để áp dụng mã này.';
+                $msg = 'Đơn hàng chưa đạt giá trị tối thiểu '.number_format($voucher->min_order_value, 0, ',', '.').'đ để áp dụng mã này.';
             }
 
             return response()->json([
                 'success' => false,
-                'message' => $msg
+                'message' => $msg,
             ]);
         }
 
@@ -47,7 +47,7 @@ class VoucherApiController extends Controller
             'data' => [
                 'code' => $voucher->code,
                 'discount_amount' => $discount,
-            ]
+            ],
         ]);
     }
 }

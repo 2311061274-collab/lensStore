@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\News;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 
 class NewsController extends Controller
@@ -12,6 +11,7 @@ class NewsController extends Controller
     public function index()
     {
         $news = News::orderBy('created_at', 'desc')->paginate(10);
+
         return view('admin.news.index', compact('news'));
     }
 
@@ -32,11 +32,11 @@ class NewsController extends Controller
             'image_upload' => 'nullable|image|max:2048',
         ]);
 
-        $news = new News();
+        $news = new News;
         $news->title = $request->title;
         $news->description = $request->description;
         $news->content = $request->content;
-        
+
         if ($request->hasFile('image_upload')) {
             $path = $request->file('image_upload')->store('news', 'public');
             $news->image_url = Storage::url($path);
@@ -99,6 +99,7 @@ class NewsController extends Controller
     public function destroy(News $news)
     {
         $news->delete();
+
         return redirect()->route('admin.news.index')->with('success', 'Tin tức đã bị xóa.');
     }
 }

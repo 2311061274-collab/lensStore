@@ -30,7 +30,7 @@ class Voucher extends Model
      */
     public function isValidForOrder(float $orderValue): bool
     {
-        if (!$this->is_active) {
+        if (! $this->is_active) {
             return false;
         }
 
@@ -59,7 +59,7 @@ class Voucher extends Model
      */
     public function calculateDiscount(float $orderValue): float
     {
-        if (!$this->isValidForOrder($orderValue)) {
+        if (! $this->isValidForOrder($orderValue)) {
             return 0;
         }
 
@@ -69,7 +69,7 @@ class Voucher extends Model
 
         // Percent
         $discount = $orderValue * ($this->discount_value / 100);
-        
+
         if ($this->max_discount_value && $discount > $this->max_discount_value) {
             $discount = $this->max_discount_value;
         }

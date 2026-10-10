@@ -327,9 +327,14 @@
                         @error('price')<div class="error-text">{{ $message }}</div>@enderror
                     </div>
                     <div class="field">
-                        <label>Số lượng tồn kho <span class="req">*</span></label>
-                        <input type="number" name="stock" value="{{ old('stock', $product->stock) }}" required min="0" placeholder="0">
-                        @error('stock')<div class="error-text">{{ $message }}</div>@enderror
+                        <label>Số lượng tồn kho (Khả dụng)</label>
+                        <div style="position:relative;">
+                            <input type="number" value="{{ $product->stock }}" readonly style="background:#f1f5f9; cursor:not-allowed; font-weight:700; color:#334155;">
+                            <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:0.75rem; color:#64748b; font-weight:600;">chiếc</span>
+                        </div>
+                        <div style="font-size:0.78rem; color:#64748b; margin-top:5px; line-height:1.4;">
+                            <i class="fa-solid fa-lock" style="color:#f59e0b;"></i> Tồn kho được quản lý tự động qua <strong>Phiếu Nhập (PNK)</strong> & <strong>Phiếu Xuất (PXK)</strong>.
+                        </div>
                     </div>
                 </div>
             </div>

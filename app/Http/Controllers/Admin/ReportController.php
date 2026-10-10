@@ -6,11 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
-use App\Models\ReturnRequest;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Carbon\Carbon;
 
 class ReportController extends Controller
 {
@@ -55,12 +54,12 @@ class ReportController extends Controller
             ->whereIn('status', $validStatuses)->count();
 
         $allOrdersCount = Order::whereBetween('created_at', [$startDate, $endDate])->count();
-        
+
         $aov = $totalCompletedOrders > 0 ? $totalRevenue / $totalCompletedOrders : 0;
 
         $badOrdersCount = Order::whereBetween('created_at', [$startDate, $endDate])
             ->whereIn('status', ['cancelled', 'returned'])->count();
-        
+
         $returnCancelRate = $allOrdersCount > 0 ? ($badOrdersCount / $allOrdersCount) * 100 : 0;
 
         $newCustomers = User::where('role', 'customer')
@@ -69,9 +68,9 @@ class ReportController extends Controller
         // 2. Charts Data
         // Line Chart: Revenue by Date
         $revenueChartData = Order::select(
-                DB::raw('DATE(created_at) as day'),
-                DB::raw('SUM(total) as revenue')
-            )
+            DB::raw('DATE(created_at) as day'),
+            DB::raw('SUM(total) as revenue')
+        )
             ->whereBetween('created_at', [$startDate, $endDate])
             ->whereIn('status', $validStatuses)
             ->where('payment_status', 'paid')
@@ -80,12 +79,14 @@ class ReportController extends Controller
             ->get()
             ->pluck('revenue', 'day')
             ->toArray();
-            
+
         // Fill missing days for line chart
         $chartLabels = [];
         $chartValues = [];
         $periodDays = $startDate->diffInDays($endDate);
-        if($periodDays > 60) $periodDays = 60; // Limit for UI
+        if ($periodDays > 60) {
+            $periodDays = 60;
+        } // Limit for UI
 
         for ($i = $periodDays; $i >= 0; $i--) {
             $dateObj = (clone $endDate)->subDays($i);
@@ -106,10 +107,10 @@ class ReportController extends Controller
             ->orderByDesc('revenue')
             ->limit(5)
             ->get();
-            
+
         $pieLabels = [];
         $pieValues = [];
-        foreach($brandPieData as $b) {
+        foreach ($brandPieData as $b) {
             $pieLabels[] = $b->brand ?: 'Khác';
             $pieValues[] = (int) $b->revenue;
         }
@@ -140,7 +141,6 @@ class ReportController extends Controller
             ->limit(10)
             ->get();
 
-            
         $lowStockWarning = Product::where('stock', '<', 5)
             ->orderBy('stock')
             ->limit(10)
@@ -180,14 +180,14 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($from, $to) {
             $out = fopen('php://output', 'w');
-            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
             fputcsv($out, [
                 'ID', 'Ngày', 'Khách', 'SĐT', 'Tạm tính', 'Ship', 'Giảm', 'Tổng',
                 'Thanh toán', 'Trạng thái', 'Mã GHN', 'Voucher',
             ]);
 
             Order::with('user')
-                ->whereBetween('created_at', [$from . ' 00:00:00', $to . ' 23:59:59'])
+                ->whereBetween('created_at', [$from.' 00:00:00', $to.' 23:59:59'])
                 ->orderBy('id')
                 ->chunk(200, function ($orders) use ($out) {
                     foreach ($orders as $o) {
@@ -222,19 +222,19 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($from, $to) {
             $out = fopen('php://output', 'w');
-            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
             fputcsv($out, ['Ngày', 'Số đơn', 'Doanh thu', 'Giảm giá', 'Phí ship']);
 
             $validStatuses = ['finished', 'completed'];
 
             $rows = Order::select(
-                    DB::raw('DATE(created_at) as day'),
-                    DB::raw('COUNT(*) as orders'),
-                    DB::raw('SUM(total) as revenue'),
-                    DB::raw('SUM(COALESCE(discount_amount,0)) as discount'),
-                    DB::raw('SUM(shipping_fee) as shipping')
-                )
-                ->whereBetween('created_at', [$from . ' 00:00:00', $to . ' 23:59:59'])
+                DB::raw('DATE(created_at) as day'),
+                DB::raw('COUNT(*) as orders'),
+                DB::raw('SUM(total) as revenue'),
+                DB::raw('SUM(COALESCE(discount_amount,0)) as discount'),
+                DB::raw('SUM(shipping_fee) as shipping')
+            )
+                ->whereBetween('created_at', [$from.' 00:00:00', $to.' 23:59:59'])
                 ->whereIn('status', $validStatuses)
                 ->groupBy('day')
                 ->orderBy('day')

@@ -142,7 +142,10 @@ Route::redirect('/vouchers', '/admin/vouchers');
 
 // Admin Panel
 Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () {
-    Route::middleware(['permission:view_dashboard'])->get('/', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
+    Route::middleware(['permission:view_dashboard'])->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/data', [\App\Http\Controllers\Admin\DashboardController::class, 'apiData'])->name('dashboard.data');
+    });
 
     Route::middleware(['permission:manage_orders'])->group(function () {
         Route::get('orders', [\App\Http\Controllers\Admin\OrderController::class, 'index'])->name('orders.index');
@@ -181,6 +184,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
         
         Route::get('returns', [\App\Http\Controllers\Admin\ReturnRequestController::class, 'index'])->name('returns.index');
         Route::patch('returns/{returnRequest}/status', [\App\Http\Controllers\Admin\ReturnRequestController::class, 'updateStatus'])->name('returns.update-status');
+        Route::patch('returns/{returnRequest}/confirm-refund', [\App\Http\Controllers\Admin\ReturnRequestController::class, 'confirmRefund'])->name('returns.confirm-refund');
     });
 
     Route::middleware(['permission:view_reports'])->group(function () {

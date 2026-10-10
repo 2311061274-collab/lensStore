@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Voucher;
+use Illuminate\Http\Request;
 
 class VoucherController extends Controller
 {
     public function index()
     {
         $vouchers = Voucher::latest()->paginate(10);
+
         return view('admin.vouchers.index', compact('vouchers'));
     }
 
@@ -48,7 +49,7 @@ class VoucherController extends Controller
     public function update(Request $request, Voucher $voucher)
     {
         $data = $request->validate([
-            'code' => 'required|string|unique:vouchers,code,' . $voucher->id,
+            'code' => 'required|string|unique:vouchers,code,'.$voucher->id,
             'discount_type' => 'required|in:fixed,percent',
             'discount_value' => 'required|numeric|min:0',
             'min_order_value' => 'nullable|numeric|min:0',
@@ -70,6 +71,7 @@ class VoucherController extends Controller
     public function destroy(Voucher $voucher)
     {
         $voucher->delete();
+
         return redirect()->route('admin.vouchers.index')->with('success', 'Voucher đã được xóa.');
     }
 }

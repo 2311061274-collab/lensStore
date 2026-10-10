@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\UserAddress;
 use Illuminate\Http\Request;
 
 class UserAddressController extends Controller
@@ -30,9 +31,11 @@ class UserAddressController extends Controller
         return back()->with('success', 'Thêm địa chỉ thành công.');
     }
 
-    public function update(Request $request, \App\Models\UserAddress $address)
+    public function update(Request $request, UserAddress $address)
     {
-        if ($address->user_id !== auth()->id()) abort(403);
+        if ($address->user_id !== auth()->id()) {
+            abort(403);
+        }
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
@@ -47,7 +50,7 @@ class UserAddressController extends Controller
             $data['is_default'] = false;
         }
 
-        if ($data['is_default'] && !$address->is_default) {
+        if ($data['is_default'] && ! $address->is_default) {
             auth()->user()->addresses()->update(['is_default' => false]);
         }
 
@@ -56,10 +59,13 @@ class UserAddressController extends Controller
         return back()->with('success', 'Cập nhật địa chỉ thành công.');
     }
 
-    public function destroy(\App\Models\UserAddress $address)
+    public function destroy(UserAddress $address)
     {
-        if ($address->user_id !== auth()->id()) abort(403);
+        if ($address->user_id !== auth()->id()) {
+            abort(403);
+        }
         $address->delete();
+
         return back()->with('success', 'Xóa địa chỉ thành công.');
     }
 }

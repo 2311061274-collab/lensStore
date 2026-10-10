@@ -19,9 +19,9 @@ class OrderItem extends Model
     ];
 
     protected $casts = [
-        'quantity'   => 'integer',
+        'quantity' => 'integer',
         'unit_price' => 'integer',
-        'subtotal'   => 'integer',
+        'subtotal' => 'integer',
     ];
 
     public function order()

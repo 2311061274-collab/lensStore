@@ -14,34 +14,38 @@ class UserController extends Controller
         $query = User::with('roles')->latest();
 
         if ($request->filled('role')) {
-            $query->whereHas('roles', fn($q) => $q->where('name', $request->role));
+            $query->whereHas('roles', fn ($q) => $q->where('name', $request->role));
         }
 
         $users = $query->paginate(10)->withQueryString();
         $roles = Role::all();
+
         return view('users.index', compact('users', 'roles'));
     }
 
     public function create()
     {
         $roles = Role::all();
+
         return view('users.create', compact('roles'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|max:255|unique:users',
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role'     => 'required|exists:roles,name',
+            'role' => 'required|exists:roles,name',
         ]);
 
         $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
+            'name' => $request->name,
+            'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role'     => match($request->role) { 'admin' => 'admin', 'Khách hàng' => 'customer', 'customer' => 'customer', default => 'staff' }, // keep legacy column in sync
+            'role' => match ($request->role) {
+                'admin' => 'admin', 'Khách hàng' => 'customer', 'customer' => 'customer', default => 'staff'
+            }, // keep legacy column in sync
         ]);
 
         $user->assignRole($request->role);
@@ -57,22 +61,25 @@ class UserController extends Controller
     public function edit(User $user)
     {
         $roles = Role::all();
+
         return view('users.edit', compact('user', 'roles'));
     }
 
     public function update(Request $request, User $user)
     {
         $request->validate([
-            'name'  => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'role'  => 'required|exists:roles,name',
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
+            'role' => 'required|exists:roles,name',
             'avatar' => 'nullable|image|max:2048',
         ]);
 
         $data = [
-            'name'  => $request->name,
+            'name' => $request->name,
             'email' => $request->email,
-            'role'  => match($request->role) { 'admin' => 'admin', 'Khách hàng' => 'customer', 'customer' => 'customer', default => 'staff' }, // legacy column
+            'role' => match ($request->role) {
+                'admin' => 'admin', 'Khách hàng' => 'customer', 'customer' => 'customer', default => 'staff'
+            }, // legacy column
         ];
 
         if ($request->filled('password')) {
@@ -82,7 +89,7 @@ class UserController extends Controller
 
         if ($request->hasFile('avatar')) {
             $path = $request->file('avatar')->store('avatars', 'public');
-            $data['avatar'] = 'storage/' . $path;
+            $data['avatar'] = 'storage/'.$path;
         }
 
         $user->update($data);
@@ -95,14 +102,18 @@ class UserController extends Controller
     {
         $request->validate(['role' => 'required|exists:roles,name']);
         $user->syncRoles([$request->role]);
-        $legacyRole = match($request->role) { 'admin' => 'admin', 'Khách hàng' => 'customer', 'customer' => 'customer', default => 'staff' };
+        $legacyRole = match ($request->role) {
+            'admin' => 'admin', 'Khách hàng' => 'customer', 'customer' => 'customer', default => 'staff'
+        };
         $user->update(['role' => $legacyRole]); // keep legacy column in sync
+
         return redirect()->back()->with('success', "Đã cập nhật vai trò của {$user->name} thành công.");
     }
 
     public function destroy(User $user)
     {
         $user->delete();
+
         return redirect()->route('admin.users.index')->with('success', 'Xóa tài khoản thành công.');
     }
 
@@ -114,10 +125,10 @@ class UserController extends Controller
                 \Storage::disk('public')->delete($path);
             }
             $user->update(['avatar' => null]);
+
             return redirect()->back()->with('success', "Đã xóa ảnh đại diện của tài khoản {$user->name} và yêu cầu cập nhật ảnh mới.");
         }
+
         return redirect()->back()->with('error', 'Người dùng này chưa có ảnh đại diện.');
     }
 }
-
-

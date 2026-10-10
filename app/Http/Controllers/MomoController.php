@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\PaymentTransaction;
 use App\Services\MomoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -57,7 +56,7 @@ class MomoController extends Controller
         $message = $data['message'] ?? 'Thanh toán không thành công.';
 
         return redirect()->route('orders.show', $orderId)
-            ->with('error', 'Thanh toán thất bại: ' . $message);
+            ->with('error', 'Thanh toán thất bại: '.$message);
     }
 
     /**
@@ -74,10 +73,10 @@ class MomoController extends Controller
         // MoMo yêu cầu trả về HTTP 200 dù thành công hay thất bại
         return response()->json([
             'partnerCode' => config('services.momo.partner_code'),
-            'requestId'   => $data['requestId'] ?? '',
-            'orderId'     => $data['orderId'] ?? '',
-            'resultCode'  => $success ? 0 : 1,
-            'message'     => $success ? 'Confirmed' : 'Failed',
+            'requestId' => $data['requestId'] ?? '',
+            'orderId' => $data['orderId'] ?? '',
+            'resultCode' => $success ? 0 : 1,
+            'message' => $success ? 'Confirmed' : 'Failed',
             'responseTime' => now()->timestamp * 1000,
         ]);
     }
@@ -88,8 +87,11 @@ class MomoController extends Controller
 
     private function extractOrderId(string $extraData): ?int
     {
-        if (!$extraData) return null;
+        if (! $extraData) {
+            return null;
+        }
         $decoded = json_decode(base64_decode($extraData), true);
+
         return $decoded['order_id'] ?? null;
     }
 }

@@ -17,7 +17,7 @@ class CategoryController extends Controller
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                ->orWhere('description', 'like', "%{$search}%");
         }
 
         $categories = $query->paginate(10)->withQueryString();
@@ -40,17 +40,22 @@ class CategoryController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:categories,name',
+            'slug' => 'nullable|string|max:255|unique:categories,slug',
             'description' => 'nullable|string|max:1000',
+            'is_active' => 'nullable|boolean',
         ], [
             'name.required' => 'Vui lòng nhập tên danh mục ống kính.',
             'name.unique' => 'Tên danh mục này đã tồn tại trong hệ thống.',
             'name.max' => 'Tên danh mục không được vượt quá 255 ký tự.',
+            'slug.unique' => 'Đường dẫn tĩnh (slug) này đã tồn tại.',
         ]);
+
+        $validated['is_active'] = $request->has('is_active') ? (bool) $request->is_active : true;
 
         Category::create($validated);
 
         return redirect()->route('admin.categories.index')
-                         ->with('success', 'Thêm danh mục ống kính thành công!');
+            ->with('success', 'Thêm danh mục ống kính thành công!');
     }
 
     /**
@@ -59,6 +64,7 @@ class CategoryController extends Controller
     public function show(Category $category)
     {
         $category->load('products');
+
         return view('categories.show', compact('category'));
     }
 
@@ -76,29 +82,39 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:categories,name,' . $category->id,
+            'name' => 'required|string|max:255|unique:categories,name,'.$category->id,
+            'slug' => 'nullable|string|max:255|unique:categories,slug,'.$category->id,
             'description' => 'nullable|string|max:1000',
+            'is_active' => 'nullable|boolean',
         ], [
             'name.required' => 'Vui lòng nhập tên danh mục ống kính.',
             'name.unique' => 'Tên danh mục này đã tồn tại trong hệ thống.',
             'name.max' => 'Tên danh mục không được vượt quá 255 ký tự.',
+            'slug.unique' => 'Đường dẫn tĩnh (slug) này đã tồn tại trên danh mục khác.',
         ]);
+
+        $validated['is_active'] = $request->has('is_active') ? (bool) $request->is_active : true;
 
         $category->update($validated);
 
         return redirect()->route('admin.categories.index')
-                         ->with('success', 'Cập nhật danh mục thành công!');
+            ->with('success', 'Cập nhật danh mục thành công!');
     }
 
     /**
-     * Xóa danh mục
+     * Xóa danh mục (Bảo vệ toàn vẹn: không xóa nếu đang có sản phẩm)
      */
     public function destroy(Category $category)
     {
+        $productCount = $category->products()->count();
+        if ($productCount > 0) {
+            return back()->with('error', "Không thể xóa danh mục '{$category->name}' vì đang có {$productCount} sản phẩm liên kết. Vui lòng chuyển các sản phẩm sang danh mục khác trước khi xóa.");
+        }
+
         $categoryName = $category->name;
         $category->delete();
 
         return redirect()->route('admin.categories.index')
-                         ->with('success', "Đã xóa danh mục '{$categoryName}' thành công!");
+            ->with('success', "Đã xóa danh mục '{$categoryName}' thành công!");
     }
 }

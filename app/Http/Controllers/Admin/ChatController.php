@@ -9,6 +9,7 @@ use App\Support\ChatSupport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class ChatController extends Controller
 {
@@ -44,14 +45,14 @@ class ChatController extends Controller
                 continue;
             }
 
-            if (!isset($threads[$customerId])) {
+            if (! isset($threads[$customerId])) {
                 $threads[$customerId] = [
                     'last' => $msg,
                     'unread' => 0,
                 ];
             }
 
-            if (!$msg->is_read && !$staffIds->contains($msg->sender_id)) {
+            if (! $msg->is_read && ! $staffIds->contains($msg->sender_id)) {
                 $threads[$customerId]['unread']++;
             }
         }
@@ -64,7 +65,7 @@ class ChatController extends Controller
         $payload = collect($threads)
             ->map(function (array $thread, $customerId) use ($users) {
                 $user = $users->get((int) $customerId);
-                if (!$user) {
+                if (! $user) {
                     return null;
                 }
 
@@ -75,7 +76,7 @@ class ChatController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'unread' => $thread['unread'],
-                    'last_message' => \Illuminate\Support\Str::limit($last->content, 60),
+                    'last_message' => Str::limit($last->content, 60),
                     'last_at' => $last->created_at?->timezone(config('app.timezone'))->format('H:i'),
                     'last_id' => $last->id,
                 ];
@@ -138,14 +139,14 @@ class ChatController extends Controller
         abort_if(ChatSupport::isStaff($customer), 422, 'Không thể gửi tin cho nhân viên khác tại đây.');
 
         $content = trim($data['message'] ?? '');
-        if ($content === '' && !$request->hasFile('image')) {
+        if ($content === '' && ! $request->hasFile('image')) {
             return response()->json(['error' => 'Nội dung tin nhắn hoặc hình ảnh không được để trống'], 422);
         }
 
         $imagePath = null;
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('chat_images', 'public');
-            $imagePath = 'storage/' . $path;
+            $imagePath = 'storage/'.$path;
         }
 
         $message = Message::create([

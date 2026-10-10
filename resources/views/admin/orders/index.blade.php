@@ -71,6 +71,25 @@
     <button class="btn" type="submit"><i class="fa-solid fa-arrow-down-wide-short"></i> Áp dụng</button>
 </form>
 
+@if(request()->hasAny(['date', 'cod_unpaid', 'shipping_delayed', 'payment_status', 'payment_method', 'status', 'search']))
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+    <span style="font-size:0.85rem;color:var(--muted);"><i class="fa-solid fa-filter"></i> Đang lọc:</span>
+    @if(request('date') === 'today')
+        <span class="badge" style="background:var(--teal-soft);color:var(--teal);">Đơn tạo hôm nay <a href="{{ route('admin.orders.index', request()->except('date')) }}" style="margin-left:4px;color:inherit;font-weight:bold;">&times;</a></span>
+    @endif
+    @if(request('cod_unpaid'))
+        <span class="badge" style="background:var(--warn-soft);color:var(--warn);">Tiền COD chưa thu <a href="{{ route('admin.orders.index', request()->except('cod_unpaid')) }}" style="margin-left:4px;color:inherit;font-weight:bold;">&times;</a></span>
+    @endif
+    @if(request('shipping_delayed'))
+        <span class="badge" style="background:var(--danger-soft);color:var(--danger);">Đơn giao chậm (> 3 ngày) <a href="{{ route('admin.orders.index', request()->except('shipping_delayed')) }}" style="margin-left:4px;color:inherit;font-weight:bold;">&times;</a></span>
+    @endif
+    @if(request('status'))
+        <span class="badge" style="background:var(--ok-soft);color:var(--ok);">Trạng thái: {{ request('status') === 'completed' ? 'Đã hoàn tất / Giao thành công' : request('status') }} <a href="{{ route('admin.orders.index', request()->except('status')) }}" style="margin-left:4px;color:inherit;font-weight:bold;">&times;</a></span>
+    @endif
+    <a href="{{ route('admin.orders.index') }}" class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:0.75rem;">Xóa bộ lọc</a>
+</div>
+@endif
+
 <div class="card flush" style="padding:0;overflow:hidden;">
     <div class="table-wrap">
         <table class="data">

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Cart;
-use App\Models\Order;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +61,7 @@ class CustomerController extends Controller
                 // $query->latest() is already applied by default
             } elseif ($request->sort === 'oldest') {
                 // Remove the default latest() and apply oldest()
-                $query->getQuery()->orders = null; 
+                $query->getQuery()->orders = null;
                 $query->oldest();
             }
         }
@@ -144,10 +143,11 @@ class CustomerController extends Controller
     {
         abort_unless($customer->role === 'customer', 404);
 
-        $customer->is_active = !$customer->is_active;
+        $customer->is_active = ! $customer->is_active;
         $customer->save();
 
         $status = $customer->is_active ? 'mở khóa' : 'khóa';
+
         return back()->with('success', "Đã {$status} tài khoản khách hàng.");
     }
 
