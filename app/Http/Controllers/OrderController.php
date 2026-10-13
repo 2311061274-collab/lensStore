@@ -140,16 +140,6 @@ class OrderController extends Controller
 
                 $product->decrement('stock', $cart->quantity);
                 $product->increment('reserved_stock', $cart->quantity);
-
-                // Ghi nhận lịch sử giữ kho
-                InventoryTransaction::create([
-                    'product_id' => $product->id,
-                    'type' => 'out',
-                    'quantity' => $cart->quantity,
-                    'reference_type' => Order::class,
-                    'reference_id' => $order->id,
-                    'note' => 'Giữ kho cho Đơn hàng #'.$order->order_code,
-                ]);
             }
 
             // Xóa giỏ hàng những sản phẩm đã chọn
@@ -219,16 +209,19 @@ class OrderController extends Controller
                 if ($item->product_id) {
                     $prod = Product::lockForUpdate()->find($item->product_id);
                     if ($prod) {
-                        $prod->decrement('reserved_stock', $item->quantity);
+                        $reservedDeduct = min((int) $prod->reserved_stock, (int) $item->quantity);
+                        if ($reservedDeduct > 0) {
+                            $prod->decrement('reserved_stock', $reservedDeduct);
+                        }
                         $prod->increment('stock', $item->quantity);
 
                         InventoryTransaction::create([
                             'product_id' => $prod->id,
-                            'type' => 'in',
+                            'type' => 'adjustment',
                             'quantity' => $item->quantity,
                             'reference_type' => Order::class,
                             'reference_id' => $lockedOrder->id,
-                            'note' => 'Khách hủy đơn #'.($lockedOrder->order_code ?? $lockedOrder->id).' - hoàn tồn kho bán',
+                            'note' => 'Khách hủy đơn #'.($lockedOrder->order_code ?? $lockedOrder->id).' - hoàn trả giữ chỗ về kho bán',
                         ]);
                     }
                 }

@@ -53,6 +53,13 @@ class ReportController extends Controller
         $totalCompletedOrders = Order::whereBetween('created_at', [$startDate, $endDate])
             ->whereIn('status', $validStatuses)->count();
 
+        $totalSoldProducts = (int) DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereBetween('orders.created_at', [$startDate, $endDate])
+            ->whereIn('orders.status', $validStatuses)
+            ->where('orders.payment_status', 'paid')
+            ->sum('order_items.quantity');
+
         $allOrdersCount = Order::whereBetween('created_at', [$startDate, $endDate])->count();
 
         $aov = $totalCompletedOrders > 0 ? $totalRevenue / $totalCompletedOrders : 0;
@@ -165,7 +172,7 @@ class ReportController extends Controller
 
         return view('admin.reports.index', compact(
             'filter', 'from', 'to', 'startDate', 'endDate',
-            'totalRevenue', 'totalCompletedOrders', 'aov', 'returnCancelRate', 'newCustomers',
+            'totalRevenue', 'totalCompletedOrders', 'totalSoldProducts', 'aov', 'returnCancelRate', 'newCustomers',
             'chartLabels', 'chartValues', 'pieLabels', 'pieValues',
             'bestSellers', 'deadStock', 'lowStockWarning', 'topSpenders'
         ));

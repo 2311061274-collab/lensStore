@@ -27,3 +27,6 @@ Homestead.yaml
 Thumbs.db
 /lensStore
 /dist
+.env.bak
+*.sql
+/scratch

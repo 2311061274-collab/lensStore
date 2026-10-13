@@ -124,56 +124,90 @@ class OrderController extends Controller
                 $data['payment_status'] = 'paid';
             }
 
-            // Xử lý luồng tồn kho TỰ ĐỘNG dựa theo thiết kế Kiến trúc Kho WMS
+            // Xử lý luồng tồn kho TỰ ĐỘNG dựa theo thiết kế Kiến trúc Kho WMS (Bảo đảm Idempotency & chống lệch kho)
             if ($old !== 'completed' && $old !== 'finished' && in_array($data['status'], ['completed', 'finished'])) {
-                // 1. Đơn giao thành công -> Trừ reserved_stock và tạo Phiếu Xuất Kho tự động
+                // 1. Đơn giao thành công -> Trừ reserved_stock và tạo Phiếu Xuất Kho tự động (nếu chưa từng tạo)
                 $lockedOrder->load('items');
-                $issue = GoodsIssue::create([
-                    'order_id' => $lockedOrder->id,
-                    'user_id' => auth()->id(),
-                    'type' => 'sale',
-                    'status' => 'completed',
-                    'note' => 'Hệ thống tự động xuất kho do Đơn hàng #'.$lockedOrder->id.' giao thành công',
-                ]);
+                $existingIssue = GoodsIssue::where('order_id', $lockedOrder->id)->where('type', 'sale')->first();
 
-                foreach ($lockedOrder->items as $item) {
-                    if ($item->product_id) {
-                        $product = Product::lockForUpdate()->find($item->product_id);
-                        if ($product) {
-                            $product->decrement('reserved_stock', $item->quantity);
-                            $issue->details()->create([
-                                'product_id' => $product->id,
-                                'quantity' => $item->quantity,
-                            ]);
-                            InventoryTransaction::create([
-                                'product_id' => $product->id,
-                                'type' => 'out',
-                                'quantity' => $item->quantity,
-                                'reference_type' => GoodsIssue::class,
-                                'reference_id' => $issue->id,
-                                'note' => 'Xuất bán Đơn hàng #'.$lockedOrder->id,
-                            ]);
+                if (! $existingIssue) {
+                    $issue = GoodsIssue::create([
+                        'order_id' => $lockedOrder->id,
+                        'user_id' => auth()->id(),
+                        'type' => 'sale',
+                        'status' => 'completed',
+                        'note' => 'Hệ thống tự động xuất kho do Đơn hàng #'.($lockedOrder->order_code ?? $lockedOrder->id).' giao thành công',
+                    ]);
+
+                    foreach ($lockedOrder->items as $item) {
+                        if ($item->product_id) {
+                            $product = Product::lockForUpdate()->find($item->product_id);
+                            if ($product) {
+                                $reservedDeduct = min((int) $product->reserved_stock, (int) $item->quantity);
+                                if ($reservedDeduct > 0) {
+                                    $product->decrement('reserved_stock', $reservedDeduct);
+                                }
+                                $issue->details()->create([
+                                    'product_id' => $product->id,
+                                    'quantity' => $item->quantity,
+                                ]);
+                                InventoryTransaction::create([
+                                    'product_id' => $product->id,
+                                    'type' => 'out',
+                                    'quantity' => $item->quantity,
+                                    'reference_type' => GoodsIssue::class,
+                                    'reference_id' => $issue->id,
+                                    'note' => 'Xuất bán Đơn hàng #'.($lockedOrder->order_code ?? $lockedOrder->id),
+                                ]);
+                            }
                         }
                     }
                 }
             } elseif (! in_array($old, ['cancelled', 'returning', 'returned']) && $data['status'] === 'cancelled') {
-                // 2. Admin Hủy đơn -> Trả lại reserved_stock về stock bán được
+                // 2. Admin Hủy đơn -> Phân biệt đơn đã xuất kho hay chưa xuất kho để xử lý đúng nguồn hàng
                 $lockedOrder->load('items');
-                foreach ($lockedOrder->items as $item) {
-                    if ($item->product_id) {
-                        $product = Product::lockForUpdate()->find($item->product_id);
-                        if ($product) {
-                            $product->decrement('reserved_stock', $item->quantity);
-                            $product->increment('stock', $item->quantity);
+                $existingIssue = GoodsIssue::where('order_id', $lockedOrder->id)->where('type', 'sale')->first();
 
-                            InventoryTransaction::create([
-                                'product_id' => $product->id,
-                                'type' => 'in',
-                                'quantity' => $item->quantity,
-                                'reference_type' => Order::class,
-                                'reference_id' => $lockedOrder->id,
-                                'note' => 'Admin hủy Đơn #'.($lockedOrder->order_code ?? $lockedOrder->id).' - hoàn lại tồn kho bán',
-                            ]);
+                if ($existingIssue && $existingIssue->status === 'completed') {
+                    // Đơn đã từng xuất kho nay hủy -> Đánh dấu hủy phiếu xuất và hoàn hàng lại vào kho bán
+                    $existingIssue->update(['status' => 'cancelled', 'note' => $existingIssue->note.' [ĐÃ HỦY ĐƠN]']);
+                    foreach ($lockedOrder->items as $item) {
+                        if ($item->product_id) {
+                            $product = Product::lockForUpdate()->find($item->product_id);
+                            if ($product) {
+                                $product->increment('stock', $item->quantity);
+                                InventoryTransaction::create([
+                                    'product_id' => $product->id,
+                                    'type' => 'in',
+                                    'quantity' => $item->quantity,
+                                    'reference_type' => Order::class,
+                                    'reference_id' => $lockedOrder->id,
+                                    'note' => 'Admin hủy Đơn đã xuất kho #'.($lockedOrder->order_code ?? $lockedOrder->id).' - hoàn hàng vào kho bán',
+                                ]);
+                            }
+                        }
+                    }
+                } else {
+                    // Đơn chưa xuất kho (mới giữ kho reserved_stock) -> Giải phóng reserved_stock trả lại stock bán
+                    foreach ($lockedOrder->items as $item) {
+                        if ($item->product_id) {
+                            $product = Product::lockForUpdate()->find($item->product_id);
+                            if ($product) {
+                                $reservedDeduct = min((int) $product->reserved_stock, (int) $item->quantity);
+                                if ($reservedDeduct > 0) {
+                                    $product->decrement('reserved_stock', $reservedDeduct);
+                                }
+                                $product->increment('stock', $item->quantity);
+
+                                InventoryTransaction::create([
+                                    'product_id' => $product->id,
+                                    'type' => 'adjustment',
+                                    'quantity' => $item->quantity,
+                                    'reference_type' => Order::class,
+                                    'reference_id' => $lockedOrder->id,
+                                    'note' => 'Admin hủy Đơn chưa xuất #'.($lockedOrder->order_code ?? $lockedOrder->id).' - giải phóng giữ chỗ về kho bán',
+                                ]);
+                            }
                         }
                     }
                 }

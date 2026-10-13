@@ -61,8 +61,9 @@
         </div>
         <div class="stat-card">
             <div class="stat-icon" style="background:#10b981;"><i class="fa-solid fa-box-open"></i></div>
-            <div class="label">Đơn Hàng Mới</div>
-            <div class="value" style="color:#10b981; font-size:1.3rem;">{{ number_format($totalCompletedOrders) }}</div>
+            <div class="label">Đơn Hàng Đã Bán</div>
+            <div class="value" style="color:#10b981; font-size:1.3rem;">{{ number_format($totalCompletedOrders) }} <span style="font-size:0.85rem; font-weight:normal; color:var(--text-muted);">đơn</span></div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">Tổng: <strong style="color:#10b981;">{{ number_format($totalSoldProducts) }}</strong> sản phẩm</div>
         </div>
         <div class="stat-card">
             <div class="stat-icon" style="background:#f59e0b;"><i class="fa-solid fa-receipt"></i></div>

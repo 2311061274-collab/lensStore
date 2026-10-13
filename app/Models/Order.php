@@ -48,6 +48,16 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function returnRequest()
+    {
+        return $this->hasOne(ReturnRequest::class)->latestOfMany();
+    }
+
+    public function goodsIssues()
+    {
+        return $this->hasMany(GoodsIssue::class);
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {

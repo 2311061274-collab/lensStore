@@ -3,17 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class ReturnRequest extends Model
 {
     protected $fillable = [
+        'request_code',
         'user_id',
         'order_id',
         'reason',
         'note',
         'image',
+        'video_url',
         'status',
         'tracking_code',
+        'return_shipping_status',
         'bank_name',
         'bank_account_holder',
         'bank_account_number',
@@ -25,6 +29,20 @@ class ReturnRequest extends Model
         'refund_reference',
         'refund_note',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->request_code)) {
+                $model->request_code = 'RT-'.now()->format('ymd').'-'.strtoupper(Str::random(4));
+            }
+            if (empty($model->return_shipping_status)) {
+                $model->return_shipping_status = ! empty($model->tracking_code) ? 'tracking_assigned' : 'pending_tracking';
+            }
+        });
+    }
 
     protected $casts = [
         'refund_amount' => 'integer',
@@ -90,6 +108,30 @@ class ReturnRequest extends Model
         };
     }
 
+    public function getReturnShippingStatusLabelAttribute(): string
+    {
+        return match ($this->return_shipping_status) {
+            'pending_tracking' => 'Chờ cấp mã vận đơn',
+            'tracking_assigned' => 'Đã có mã vận đơn',
+            'picking_up' => 'Đang lấy hàng',
+            'delivering_back' => 'Đang vận chuyển về',
+            'received' => 'Đã nhận hàng tại kho',
+            default => 'Chờ cấp mã vận đơn',
+        };
+    }
+
+    public function getReturnShippingStatusColorAttribute(): string
+    {
+        return match ($this->return_shipping_status) {
+            'pending_tracking' => '#f59e0b',
+            'tracking_assigned' => '#3b82f6',
+            'picking_up' => '#8b5cf6',
+            'delivering_back' => '#6366f1',
+            'received' => '#10b981',
+            default => '#6b7280',
+        };
+    }
+
     /**
      * Đường dẫn truy cập ảnh bằng chứng hợp lệ
      */
@@ -104,5 +146,29 @@ class ReturnRequest extends Model
         }
 
         return asset($this->image);
+    }
+
+    /**
+     * Chuyển đổi Google Drive link sang link preview/embed nếu có
+     */
+    public function getGoogleDrivePreviewUrlAttribute(): ?string
+    {
+        if (empty($this->video_url)) {
+            return null;
+        }
+
+        $url = trim($this->video_url);
+
+        // Trường hợp link dạng /file/d/{ID}/view
+        if (preg_match('/\/file\/d\/([a-zA-Z0-9_-]+)/', $url, $matches)) {
+            return "https://drive.google.com/file/d/{$matches[1]}/preview";
+        }
+
+        // Trường hợp link dạng open?id={ID} hoặc uc?id={ID}
+        if (preg_match('/[?&]id=([a-zA-Z0-9_-]+)/', $url, $matches)) {
+            return "https://drive.google.com/file/d/{$matches[1]}/preview";
+        }
+
+        return $url;
     }
 }

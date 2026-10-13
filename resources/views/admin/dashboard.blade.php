@@ -81,7 +81,7 @@
         <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
         <div class="label">Đơn hoàn tất <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.7rem;opacity:0.6;"></i></div>
         <div class="value" style="color:var(--ok)" data-stat="completedOrders">{{ $completedOrders }}</div>
-        <div class="hint">Đã hủy: <span data-stat="cancelledOrders">{{ $cancelledOrders }}</span> đơn</div>
+        <div class="hint">Đã bán: <span data-stat="totalSoldProducts" style="font-weight:600;color:var(--text-primary);">{{ $totalSoldProducts }}</span> sản phẩm · Hủy: <span data-stat="cancelledOrders">{{ $cancelledOrders }}</span></div>
     </a>
 
     @if($isAdmin)

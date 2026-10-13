@@ -13,7 +13,24 @@ class ReturnRequestController extends Controller
     {
         $status = $request->query('status');
         $refundStatus = $request->query('refund_status');
-        $query = ReturnRequest::with(['user', 'order', 'refundedBy'])->latest();
+        $search = trim($request->query('search', ''));
+        $query = ReturnRequest::with(['user', 'order.items.product', 'refundedBy'])->latest();
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('request_code', 'like', "%{$search}%")
+                    ->orWhere('tracking_code', 'like', "%{$search}%")
+                    ->orWhereHas('order', function ($oq) use ($search) {
+                        $oq->where('order_code', 'like', "%{$search}%")
+                            ->orWhere('id', $search);
+                    })
+                    ->orWhereHas('user', function ($uq) use ($search) {
+                        $uq->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    });
+            });
+        }
 
         if ($status && in_array($status, ['pending', 'approved', 'rejected'])) {
             $query->where('status', $status);
@@ -52,7 +69,8 @@ class ReturnRequestController extends Controller
             'refundStatus',
             'reasonCounts',
             'totalRefunded',
-            'totalPendingRefund'
+            'totalPendingRefund',
+            'search'
         ));
     }
 
@@ -60,15 +78,22 @@ class ReturnRequestController extends Controller
     {
         $request->validate([
             'status' => 'required|in:approved,rejected',
+            'tracking_code' => 'nullable|string|max:100',
         ]);
 
         return DB::transaction(function () use ($request, $returnRequest) {
             $locked = ReturnRequest::lockForUpdate()->findOrFail($returnRequest->id);
             $updateData = ['status' => $request->status];
 
-            // Sinh mã vận đơn trả hàng khi chấp thuận
-            if ($request->status === 'approved' && empty($locked->tracking_code)) {
-                $updateData['tracking_code'] = 'RET-'.strtoupper(substr(uniqid(), -6));
+            if ($request->status === 'approved') {
+                if ($request->filled('tracking_code')) {
+                    $updateData['tracking_code'] = trim($request->tracking_code);
+                    $updateData['return_shipping_status'] = 'tracking_assigned';
+                } elseif (empty($locked->tracking_code)) {
+                    // Không tự tạo mã giả, hiển thị trạng thái chờ cấp mã
+                    $updateData['return_shipping_status'] = 'pending_tracking';
+                }
+
                 if (empty($locked->refund_amount) && $locked->order) {
                     $updateData['refund_amount'] = $locked->order->total;
                 }
@@ -88,8 +113,38 @@ class ReturnRequestController extends Controller
 
             $actionText = $request->status === 'approved' ? 'Chấp nhận yêu cầu đổi trả' : 'Từ chối yêu cầu đổi trả';
 
-            return back()->with('success', "Đã {$actionText} thành công cho đơn #{$locked->order_id}.");
+            return back()->with('success', "Đã {$actionText} thành công cho yêu cầu #{$locked->request_code} (Đơn #{$locked->order_id}).");
         });
+    }
+
+    /**
+     * Cập nhật mã vận đơn trả hàng và trạng thái vận chuyển từ Admin / ĐVVC
+     */
+    public function updateTracking(Request $request, ReturnRequest $returnRequest)
+    {
+        $validated = $request->validate([
+            'tracking_code' => 'nullable|string|max:100',
+            'return_shipping_status' => 'required|in:pending_tracking,tracking_assigned,picking_up,delivering_back,received',
+        ], [
+            'tracking_code.max' => 'Mã vận đơn không được vượt quá 100 ký tự.',
+            'return_shipping_status.required' => 'Vui lòng chọn trạng thái vận chuyển.',
+            'return_shipping_status.in' => 'Trạng thái vận chuyển không hợp lệ.',
+        ]);
+
+        $trackingCode = ! empty($validated['tracking_code']) ? trim($validated['tracking_code']) : null;
+        $shippingStatus = $validated['return_shipping_status'];
+
+        // Nếu đã có mã vận đơn mà đang ở trạng thái 'pending_tracking' -> tự động chuyển sang 'tracking_assigned'
+        if ($trackingCode && $shippingStatus === 'pending_tracking') {
+            $shippingStatus = 'tracking_assigned';
+        }
+
+        $returnRequest->update([
+            'tracking_code' => $trackingCode,
+            'return_shipping_status' => $shippingStatus,
+        ]);
+
+        return back()->with('success', "Đã cập nhật mã vận đơn và trạng thái vận chuyển cho yêu cầu {$returnRequest->request_code}!");
     }
 
     /**

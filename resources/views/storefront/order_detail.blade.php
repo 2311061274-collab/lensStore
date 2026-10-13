@@ -171,6 +171,10 @@
                 </form>
                 @endif
 
+                @php
+                    $returnReq = $order->returnRequest ?: \App\Models\ReturnRequest::where('order_id', $order->id)->latest()->first();
+                @endphp
+
                 @if($order->status == 'completed')
                 <div style="display:flex; flex-direction:column; gap:8px; margin-top: 1rem;">
                     <form action="{{ route('orders.confirm-received', $order->id) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn đã nhận được hàng và hài lòng với sản phẩm? Sau khi xác nhận, bạn sẽ không thể yêu cầu Trả hàng/Hoàn tiền.');" style="margin:0;">
@@ -178,12 +182,13 @@
                         <button type="submit" style="width:100%; background:var(--primary); color:white; border:none; padding:0.8rem 1.5rem; border-radius:var(--radius-md); font-weight:700; cursor:pointer; font-size: 0.95rem;">Đã nhận được hàng</button>
                     </form>
                     <a href="{{ route('orders.review', $order->id) }}" style="display:block; text-align:center; text-decoration:none; background:var(--surface); color:var(--primary); border:1px solid var(--primary); padding:0.8rem 1.5rem; border-radius:var(--radius-md); font-weight:700; cursor:pointer; font-size: 0.95rem;">Đánh giá</a>
-                    <a href="{{ route('orders.return', $order->id) }}" style="display:block; text-align:center; text-decoration:none; background:var(--surface); color:var(--text-main); border:1px solid var(--border); padding:0.8rem 1.5rem; border-radius:var(--radius-md); font-weight:700; cursor:pointer; font-size: 0.95rem;">Trả hàng/Hoàn tiền</a>
+                    @if(!$returnReq)
+                        <a href="{{ route('orders.return', $order->id) }}" style="display:block; text-align:center; text-decoration:none; background:var(--surface); color:var(--text-main); border:1px solid var(--border); padding:0.8rem 1.5rem; border-radius:var(--radius-md); font-weight:700; cursor:pointer; font-size: 0.95rem;">Trả hàng/Hoàn tiền</a>
+                    @endif
                 </div>
                 @elseif($order->status == 'finished')
                 <div style="display:flex; flex-direction:column; gap:8px; margin-top: 1rem;">
-                    @php $rejectedReturn = \App\Models\ReturnRequest::where('order_id', $order->id)->where('status', 'rejected')->first(); @endphp
-                    @if($rejectedReturn)
+                    @if($returnReq && $returnReq->status == 'rejected')
                         <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:var(--radius-md); padding:1rem; color:#991b1b; font-size:0.9rem; line-height:1.5;">
                             <i class="fa-solid fa-circle-xmark"></i> <strong>Yêu cầu trả hàng bị từ chối</strong><br>
                             Cửa hàng đã từ chối yêu cầu của bạn. Đơn hàng được chuyển về trạng thái Đã hoàn thành.
@@ -198,18 +203,112 @@
                     Yêu cầu của bạn đang được cửa hàng xem xét. Bạn sẽ nhận được thông báo ngay khi có kết quả.
                 </div>
                 @elseif($order->status == 'returned')
-                @php $approvedReturn = \App\Models\ReturnRequest::where('order_id', $order->id)->where('status', 'approved')->first(); @endphp
                 <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-md); padding:1rem; margin-top:1rem; color:#1e3a8a; font-size:0.9rem; line-height:1.5;">
                     <i class="fa-solid fa-truck-ramp-box"></i> <strong>Trả hàng / Hoàn tiền được chấp nhận</strong><br>
-                    Đơn vị vận chuyển sẽ liên hệ với bạn sớm nhất để lấy hàng. Vui lòng ghi mã vận đơn dưới đây lên kiện hàng:
-                    @if($approvedReturn && $approvedReturn->tracking_code)
-                        <div style="margin-top:0.75rem; padding:0.75rem; background:#ffffff; border:2px dashed var(--primary); border-radius:8px; font-weight:900; font-size:1.25rem; color:var(--primary); text-align:center; letter-spacing:1px;">
-                            {{ $approvedReturn->tracking_code }}
-                        </div>
-                    @endif
+                    Đơn vị vận chuyển sẽ liên hệ với bạn để lấy hàng. Vui lòng ghi mã vận đơn trả hàng lên bên ngoài hộp hàng.
                 </div>
                 @endif
             </div>
+
+            @if($returnReq)
+            <!-- CARD CHI TIẾT YÊU CẦU TRẢ HÀNG -->
+            <div class="card" style="border: 2px solid #e0e7ff; background: #ffffff;">
+                <div class="card-title" style="color: #4f46e5; border-bottom: 2px solid #eef2ff;">
+                    <i class="fa-solid fa-rotate-left"></i> Yêu cầu Trả hàng / Hoàn tiền
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Mã yêu cầu trả:</span>
+                    <span class="info-value" style="color:#4f46e5; font-family:monospace; font-size:1.05rem;">
+                        {{ $returnReq->request_code ?: ('RT-'.str_pad($returnReq->id, 6, '0', STR_PAD_LEFT)) }}
+                    </span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Mã đơn gốc:</span>
+                    <span class="info-value">#{{ $order->order_code ?: str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Trạng thái duyệt:</span>
+                    <span class="status-badge" style="background: {{ $returnReq->status_color }};">
+                        {{ $returnReq->status_label }}
+                    </span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Mã vận đơn trả:</span>
+                    <span class="info-value">
+                        @if(!empty($returnReq->tracking_code))
+                            <span style="display:inline-flex; align-items:center; gap:8px;">
+                                <strong style="color:#2563eb; font-family:monospace; font-size:1.05rem; background:#eff6ff; padding:2px 8px; border-radius:6px; border:1px solid #bfdbfe;">
+                                    {{ $returnReq->tracking_code }}
+                                </strong>
+                                <button type="button" onclick="navigator.clipboard.writeText('{{ $returnReq->tracking_code }}'); alert('Đã sao chép mã vận đơn trả hàng: {{ $returnReq->tracking_code }}');" style="background:#f1f5f9; border:1px solid #cbd5e1; padding:3px 8px; border-radius:5px; font-size:0.8rem; cursor:pointer;" title="Sao chép mã">
+                                    <i class="fa-regular fa-copy"></i> Sao chép
+                                </button>
+                            </span>
+                            <div style="font-size:0.78rem; color:#64748b; margin-top:3px;">
+                                <em>(Vận chuyển: <strong style="color:{{ $returnReq->return_shipping_status_color }}">{{ $returnReq->return_shipping_status_label }}</strong>)</em>
+                            </div>
+                        @else
+                            <span style="color:#94a3b8; font-style:italic;">Chưa có mã vận đơn</span>
+                            <div style="font-size:0.78rem; color:#64748b; margin-top:2px;">
+                                <em>(Trạng thái: {{ $returnReq->return_shipping_status_label }})</em>
+                            </div>
+                        @endif
+                    </span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Lý do trả hàng:</span>
+                    <span class="info-value">{{ $returnReq->reason }}</span>
+                </div>
+
+                @if($returnReq->note)
+                <div class="info-row">
+                    <span class="info-label">Ghi chú chi tiết:</span>
+                    <span class="info-value" style="color:#64748b; font-weight:normal;">{{ $returnReq->note }}</span>
+                </div>
+                @endif
+
+                @if($returnReq->video_url)
+                <div class="info-row">
+                    <span class="info-label">Video mở hàng:</span>
+                    <span class="info-value">
+                        <a href="{{ $returnReq->video_url }}" target="_blank" rel="noopener noreferrer" style="color:#0f9d58; text-decoration:none; font-weight:700; display:inline-flex; align-items:center; gap:6px; background:#f0fdf4; padding:4px 10px; border-radius:6px; border:1px solid #bbf7d0;">
+                            <i class="fa-brands fa-google-drive"></i> Xem video Google Drive <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.75rem;"></i>
+                        </a>
+                    </span>
+                </div>
+                @endif
+
+                @if($returnReq->bank_account_number)
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.85rem; margin-top:0.75rem; font-size:0.88rem;">
+                    <div style="font-weight:700; color:#334155; margin-bottom:4px;">
+                        <i class="fa-solid fa-building-columns" style="color:#4f46e5;"></i> Tài khoản nhận hoàn tiền:
+                    </div>
+                    <div style="color:#1e293b;">
+                        Ngân hàng: <strong>{{ $returnReq->bank_name }}</strong> · STK: <strong style="font-family:monospace;">{{ $returnReq->bank_account_number }}</strong>
+                    </div>
+                    <div style="color:#64748b; text-transform:uppercase; font-size:0.8rem; margin-top:2px;">
+                        Chủ tài khoản: {{ $returnReq->bank_account_holder }}
+                    </div>
+                    <div style="margin-top:6px; font-weight:700; color:#ef4444; font-size:0.95rem;">
+                        Số tiền hoàn: {{ number_format($returnReq->refund_amount ?: $order->total, 0, ',', '.') }} ₫
+                        <span class="status-badge" style="background:{{ $returnReq->refund_status_color }}; font-size:0.75rem; padding:2px 8px; margin-left:6px;">
+                            {{ $returnReq->refund_status_label }}
+                        </span>
+                    </div>
+                </div>
+                @endif
+
+                <div style="font-size:0.78rem; color:#94a3b8; margin-top:0.75rem; display:flex; justify-content:space-between; border-top:1px dashed #e2e8f0; padding-top:0.5rem;">
+                    <span>Tạo: {{ $returnReq->created_at->format('H:i d/m/Y') }}</span>
+                    <span>Cập nhật: {{ $returnReq->updated_at->format('H:i d/m/Y') }}</span>
+                </div>
+            </div>
+            @endif
 
             <!-- Địa chỉ giao hàng -->
             <div class="card">

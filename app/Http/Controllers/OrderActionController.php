@@ -8,9 +8,7 @@ use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class OrderActionController extends Controller
 {
@@ -44,6 +42,8 @@ class OrderActionController extends Controller
             return back()->with('error', 'Bạn đã gửi yêu cầu trả hàng cho đơn này rồi.');
         }
 
+        $order->load('items.product');
+
         return view('storefront.order_return', compact('order'));
     }
 
@@ -64,83 +64,66 @@ class OrderActionController extends Controller
         $validated = $request->validate([
             'reason' => 'required|string|max:255',
             'note' => 'nullable|string|max:1000',
-            'image' => 'nullable|file|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'video_url' => 'required|url|max:500',
             'bank_name' => 'required|string|max:100',
             'bank_account_holder' => 'required|string|max:100',
             'bank_account_number' => 'required|string|min:6|max:40',
         ], [
             'reason.required' => 'Vui lòng chọn lý do trả hàng.',
+            'video_url.required' => 'Vui lòng dán liên kết video mở hàng từ Google Drive.',
+            'video_url.url' => 'Định dạng đường dẫn liên kết video không hợp lệ.',
+            'video_url.max' => 'Đường dẫn liên kết không được vượt quá 500 ký tự.',
             'bank_name.required' => 'Vui lòng nhập tên ngân hàng nhận tiền hoàn.',
             'bank_account_holder.required' => 'Vui lòng nhập tên chủ tài khoản ngân hàng.',
             'bank_account_number.required' => 'Vui lòng nhập số tài khoản ngân hàng.',
-            'image.file' => 'Tệp tải lên không hợp lệ.',
-            'image.image' => 'Tệp tải lên phải là hình ảnh hợp lệ.',
-            'image.mimes' => 'Định dạng hình ảnh phải là JPEG, PNG, JPG hoặc WebP.',
-            'image.max' => 'Dung lượng ảnh tối đa cho phép là 5MB.',
         ]);
 
-        $imagePath = null;
-        if ($request->hasFile('image')) {
-            $file = $request->file('image');
-            if (! $file->isValid()) {
-                return back()->withInput()->with('error', 'Tệp ảnh tải lên bị lỗi hoặc bị gián đoạn. Vui lòng thử lại.');
-            }
-
-            $targetDir = public_path('uploads/returns');
-            File::ensureDirectoryExists($targetDir);
-
-            // Xác thực và chuẩn hóa phần mở rộng an toàn dựa trên MIME type thực tế
-            $detectedExt = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension());
-            if (! in_array($detectedExt, ['jpeg', 'jpg', 'png', 'webp'])) {
-                $detectedExt = 'jpg';
-            }
-
-            $fileName = 'return_'.date('Ymd_His').'_'.Str::random(16).'.'.$detectedExt;
-
-            try {
-                $file->move($targetDir, $fileName);
-                $imagePath = 'uploads/returns/'.$fileName;
-            } catch (\Throwable $e) {
-                Log::error('Upload return evidence failed: '.$e->getMessage());
-
-                return back()->withInput()->with('error', 'Không thể lưu tệp ảnh bằng chứng lên máy chủ. Vui lòng thử lại.');
-            }
+        // Kiểm tra định dạng link Google Drive hợp lệ
+        $videoUrl = trim($validated['video_url']);
+        if (! str_contains($videoUrl, 'drive.google.com') && ! str_contains($videoUrl, 'docs.google.com')) {
+            return back()->withInput()->withErrors([
+                'video_url' => 'Đường dẫn video không hợp lệ. Vui lòng cung cấp liên kết chia sẻ từ Google Drive (ví dụ: https://drive.google.com/file/d/...).',
+            ]);
         }
 
         try {
-            DB::transaction(function () use ($validated, $order, $imagePath) {
+            DB::transaction(function () use ($validated, $order, $videoUrl) {
+                // Khóa bản ghi đơn hàng để chống gửi trùng lặp đồng thời
+                $lockedOrder = Order::lockForUpdate()->findOrFail($order->id);
+
+                if (ReturnRequest::where('order_id', $lockedOrder->id)->whereIn('status', ['pending', 'approved', 'completed'])->exists()) {
+                    throw new \Exception('Đơn hàng này đã có yêu cầu đổi trả đang được xử lý.');
+                }
+
                 // Chuẩn hóa tên chủ tài khoản và số tài khoản
                 $cleanHolder = mb_strtoupper(trim($validated['bank_account_holder']));
                 $cleanNumber = preg_replace('/[^0-9A-Za-z]/', '', $validated['bank_account_number']);
 
                 ReturnRequest::create([
                     'user_id' => Auth::id(),
-                    'order_id' => $order->id,
+                    'order_id' => $lockedOrder->id,
                     'reason' => $validated['reason'],
                     'note' => $validated['note'] ?? null,
-                    'image' => $imagePath,
+                    'video_url' => $videoUrl,
                     'status' => 'pending',
+                    'return_shipping_status' => 'pending_tracking',
                     'bank_name' => trim($validated['bank_name']),
                     'bank_account_holder' => $cleanHolder,
                     'bank_account_number' => $cleanNumber,
                     'refund_status' => 'pending',
-                    'refund_amount' => (int) $order->total,
+                    'refund_amount' => (int) $lockedOrder->total,
                 ]);
 
-                $order->update(['status' => 'returning']);
+                $lockedOrder->update(['status' => 'returning']);
             });
         } catch (\Throwable $e) {
-            // Dọn dẹp file vừa tải lên nếu giao dịch cơ sở dữ liệu thất bại
-            if ($imagePath && File::exists(public_path($imagePath))) {
-                File::delete(public_path($imagePath));
-            }
             Log::error('Create return request transaction failed: '.$e->getMessage());
 
-            return back()->withInput()->with('error', 'Có lỗi xảy ra khi tạo yêu cầu hoàn hàng. Vui lòng thử lại.');
+            return back()->withInput()->with('error', $e->getMessage() ?: 'Có lỗi xảy ra khi tạo yêu cầu hoàn hàng. Vui lòng thử lại.');
         }
 
         return redirect()->route('orders.show', $order->id)
-            ->with('success', 'Đã gửi yêu cầu trả hàng / hoàn tiền thành công. LensStore sẽ liên hệ và xử lý trong thời gian sớm nhất!');
+            ->with('success', 'Đã gửi yêu cầu trả hàng / hoàn tiền thành công. LensStore sẽ đối chiếu video mở hàng và xử lý trong thời gian sớm nhất!');
     }
 
     // Form đánh giá

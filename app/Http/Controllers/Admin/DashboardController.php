@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ReturnRequest;
 use App\Models\User;
@@ -78,6 +79,7 @@ class DashboardController extends Controller
                 'preparingOrders' => $metrics['preparingOrders'],
                 'shippingOrders' => $metrics['shippingOrders'],
                 'completedOrders' => $metrics['completedOrders'],
+                'totalSoldProducts' => $metrics['totalSoldProducts'],
                 'cancelledOrders' => $metrics['cancelledOrders'],
                 'pendingReturns' => $metrics['pendingReturns'],
                 'pendingRefunds' => $metrics['pendingRefunds'],
@@ -131,6 +133,7 @@ class DashboardController extends Controller
         $preparingOrders = Order::where('status', 'preparing')->count();
         $shippingOrders = Order::whereIn('status', ['delivering', 'shipping'])->count();
         $completedOrders = Order::whereIn('status', ['completed', 'finished'])->count();
+        $totalSoldProducts = (int) OrderItem::whereHas('order', fn ($q) => $q->whereIn('status', ['completed', 'finished']))->sum('quantity');
         $cancelledOrders = Order::where('status', 'cancelled')->count();
 
         // Chỉ số Đổi trả & Hoàn tiền
@@ -240,6 +243,7 @@ class DashboardController extends Controller
             'preparingOrders',
             'shippingOrders',
             'completedOrders',
+            'totalSoldProducts',
             'cancelledOrders',
             'pendingReturns',
             'pendingRefunds',
