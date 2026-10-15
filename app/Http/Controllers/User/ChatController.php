@@ -4,18 +4,31 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Message;
+use App\Models\Product;
+use App\Models\User;
 use App\Support\ChatSupport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ChatController extends Controller
 {
+    /**
+     * Lấy danh sách tin nhắn hội thoại của người dùng (thành viên hoặc khách vãng lai)
+     */
     public function getMessages(Request $request): JsonResponse
     {
-        $user = Auth::user();
+        $user = $this->resolveUser();
+
+        if (! $user) {
+            return response()->json([
+                'messages' => [],
+                'last_id' => 0,
+                'unread' => 0,
+                'agent_name' => ChatSupport::defaultAgent()?->name ?? 'LensStore',
+            ]);
+        }
 
         if (ChatSupport::isStaff($user)) {
             return response()->json([
@@ -55,9 +68,12 @@ class ChatController extends Controller
         ]);
     }
 
+    /**
+     * Gửi tin nhắn từ phía khách hàng và kích hoạt phản hồi tự động ngoại tuyến theo từ khóa
+     */
     public function send(Request $request): JsonResponse
     {
-        $user = Auth::user();
+        $user = $this->getOrCreateUser();
 
         if (ChatSupport::isStaff($user)) {
             return response()->json([
@@ -98,90 +114,118 @@ class ChatController extends Controller
 
         $message->load(['sender:id,name,role', 'product:id,name,image,price']);
 
-        // --- BẮT ĐẦU TÍCH HỢP GEMINI AI ---
-        $geminiKey = env('GEMINI_API_KEY');
-        $aiDisabled = session('chat_ai_disabled', false);
-
-        if (! $aiDisabled) {
-            if ($geminiKey && $content) {
-                try {
-                    $aiPrompt = "Bạn là trợ lý AI ảo của cửa hàng thiết bị nhiếp ảnh LensStore. Khách hàng vừa nhắn tin: '{$content}'. Hãy trả lời tư vấn thật ngắn gọn, thân thiện, chuyên nghiệp (tối đa 2-3 câu). Không dùng định dạng markdown phức tạp.";
-
-                    $response = Http::withoutVerifying()->timeout(8)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={$geminiKey}", [
-                        'contents' => [
-                            [
-                                'parts' => [
-                                    ['text' => $aiPrompt],
-                                ],
-                            ],
-                        ],
-                    ]);
-
-                    if ($response->successful()) {
-                        $aiReply = $response->json('candidates.0.content.parts.0.text');
-                        if ($aiReply) {
-                            Message::create([
-                                'sender_id' => $agent->id,
-                                'receiver_id' => $user->id,
-                                'product_id' => $data['product_id'] ?? null,
-                                'content' => trim($aiReply),
-                                'is_read' => false,
-                            ]);
-                        } else {
-                            Log::error('Gemini AI No Text in Response: '.$response->body());
-                        }
-                    } else {
-                        $errorMsg = $response->json('error.message') ?? 'Lỗi không xác định từ máy chủ AI.';
-                        Log::error('Gemini API Error: '.$response->body());
-                        Message::create([
-                            'sender_id' => $agent->id,
-                            'receiver_id' => $user->id,
-                            'product_id' => $data['product_id'] ?? null,
-                            'content' => '🤖 Xin lỗi, tôi không thể trả lời lúc này (Lỗi: '.$errorMsg.').',
-                            'is_read' => false,
-                        ]);
-                    }
-                } catch (\Exception $e) {
-                    Log::error('Gemini AI Chat Error: '.$e->getMessage());
-                    Message::create([
-                        'sender_id' => $agent->id,
-                        'receiver_id' => $user->id,
-                        'product_id' => $data['product_id'] ?? null,
-                        'content' => '🤖 Xin lỗi, tôi đang gặp sự cố kết nối mạng ('.$e->getMessage().').',
-                        'is_read' => false,
-                    ]);
-                }
-            } elseif ($content) {
-                // Chế độ DEMO khi chưa cài đặt Key
+        // Phản hồi tự động fix cứng ngoại tuyến (không gọi API bên ngoài)
+        if ($content !== '') {
+            $autoReply = $this->getAutoReply($content, $data['product_id'] ?? null);
+            if ($autoReply) {
                 Message::create([
                     'sender_id' => $agent->id,
                     'receiver_id' => $user->id,
                     'product_id' => $data['product_id'] ?? null,
-                    'content' => '🤖 Chào bạn, tôi là AI Assistant của LensStore! (Đây là tin nhắn tự động vì bạn chưa nhập GEMINI_API_KEY trong file .env).',
+                    'content' => $autoReply,
                     'is_read' => false,
                 ]);
             }
         }
-        // --- KẾT THÚC AI ---
 
         return response()->json(ChatSupport::payload($message, $user->id));
     }
 
-    public function toggleAi(Request $request): JsonResponse
-    {
-        $disable = $request->boolean('disable_ai');
-        session(['chat_ai_disabled' => $disable]);
-
-        return response()->json(['success' => true, 'ai_disabled' => $disable]);
-    }
-
+    /**
+     * Lấy số lượng tin nhắn chưa đọc
+     */
     public function unread(): JsonResponse
     {
+        $user = $this->resolveUser();
+        if (! $user) {
+            return response()->json(['unread' => 0]);
+        }
+
         $count = Message::query()
-            ->where('receiver_id', Auth::id())
+            ->where('receiver_id', $user->id)
             ->where('is_read', false)
             ->count();
 
         return response()->json(['unread' => $count]);
+    }
+
+    /**
+     * Xác định người dùng hiện tại (Auth user hoặc Session guest)
+     */
+    protected function resolveUser(): ?User
+    {
+        $user = Auth::user();
+        if ($user) {
+            return $user;
+        }
+
+        $guestId = session('chat_guest_user_id');
+        if ($guestId) {
+            $guest = User::find($guestId);
+            if ($guest) {
+                return $guest;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Lấy hoặc tự động sinh tài khoản khách nhẹ nhàng theo Session
+     */
+    protected function getOrCreateUser(): User
+    {
+        $user = $this->resolveUser();
+        if ($user) {
+            return $user;
+        }
+
+        $code = strtoupper(Str::random(4));
+        $user = User::create([
+            'name' => 'Khách #'.$code,
+            'email' => 'guest_'.strtolower($code).'_'.time().'@lensstore.local',
+            'password' => bcrypt(Str::random(16)),
+            'role' => 'customer',
+            'email_verified_at' => now(),
+        ]);
+
+        session(['chat_guest_user_id' => $user->id]);
+
+        return $user;
+    }
+
+    /**
+     * Xử lý câu trả lời tự động fix cứng theo từ khóa (ngoại tuyến, không kết nối API)
+     */
+    protected function getAutoReply(string $content, ?int $productId = null): string
+    {
+        $lower = mb_strtolower($content, 'UTF-8');
+
+        // 1. Từ khóa về GIÁ
+        if (str_contains($lower, 'giá') || str_contains($lower, 'bao nhiêu') || str_contains($lower, 'nhiêu tiền') || str_contains($lower, 'chi phí') || str_contains($lower, 'price')) {
+            if ($productId) {
+                $product = Product::find($productId);
+                if ($product) {
+                    $formattedPrice = number_format($product->price, 0, ',', '.').' ₫';
+
+                    return "Dạ sản phẩm '{$product->name}' hiện có giá là {$formattedPrice} (hàng chính hãng mới 100%, kèm bảo hành). Nhân viên LensStore sẽ hỗ trợ tư vấn chi tiết cho bạn ngay nhé!";
+                }
+            }
+
+            return 'Dạ các dòng ống kính tại LensStore có mức giá ưu đãi từ khoảng 3.000.000 ₫ đến hơn 50.000.000 ₫ tùy thuộc vào thương hiệu (Sony, Canon, Nikon, Fujifilm, Tamron, Sigma). Bạn đang quan tâm mẫu ống kính nào để em báo giá cụ thể ạ?';
+        }
+
+        // 2. Từ khóa về LOẠI MÁY
+        if (str_contains($lower, 'loại máy') || str_contains($lower, 'máy ảnh') || str_contains($lower, 'body') || str_contains($lower, 'ngàm') || str_contains($lower, 'hãng máy')) {
+            return 'Dạ LensStore cung cấp ống kính chuyên dụng cho các loại máy ảnh phổ biến hiện nay: Sony (ngàm E/FE), Canon (ngàm RF/EF), Nikon (ngàm Z/F) và Fujifilm (ngàm X/GFX). Bạn đang sử dụng loại máy ảnh hay ngàm nào để em tư vấn dòng lens tương thích chuẩn nhất ạ?';
+        }
+
+        // 3. Từ khóa chào hỏi cơ bản
+        if (str_contains($lower, 'chào') || str_contains($lower, 'hi') || str_contains($lower, 'hello') || str_contains($lower, 'alo')) {
+            return 'Dạ LensStore xin chào bạn! Cửa hàng chuyên ống kính chính hãng Sony, Canon, Nikon, Fujifilm... Bạn cần tư vấn về loại máy, giá bán hay chính sách bảo hành ạ?';
+        }
+
+        // 4. Mặc định: thông báo đã tiếp nhận
+        return 'Dạ LensStore đã nhận được câu hỏi của bạn. Nhân viên hỗ trợ sẽ nhắn tin phản hồi bạn trong giây lát nhé!';
     }
 }

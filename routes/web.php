@@ -114,12 +114,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/orders/{order}/pay/momo', [MomoController::class, 'payAgain'])->name('momo.pay-again');
     Route::get('/user/payment/momo/callback', [MomoController::class, 'callback'])->name('momo.callback');
 
-    Route::prefix('user')->name('user.')->group(function () {
-        Route::get('/chat/messages', [UserChatController::class, 'getMessages'])->name('chat.messages');
-        Route::post('/chat/send', [UserChatController::class, 'send'])->name('chat.send');
-        Route::get('/chat/unread', [UserChatController::class, 'unread'])->name('chat.unread');
-        Route::post('/chat/toggle-ai', [UserChatController::class, 'toggleAi'])->name('chat.toggle-ai');
-    });
+});
+
+// Hỗ trợ khách hàng - Chat trực tiếp & Trả lời tự động (Cả khách vãng lai & thành viên)
+Route::prefix('user')->name('user.')->group(function () {
+    Route::get('/chat/messages', [UserChatController::class, 'getMessages'])->name('chat.messages');
+    Route::post('/chat/send', [UserChatController::class, 'send'])->name('chat.send');
+    Route::get('/chat/unread', [UserChatController::class, 'unread'])->name('chat.unread');
 });
 
 // MoMo IPN (Webhook từ server MoMo - không cần auth, không cần CSRF)

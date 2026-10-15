@@ -210,9 +210,11 @@
         <div class="ls-chat-avatar"><i class="fa-solid fa-headset"></i></div>
         <div style="flex: 1;">
             <h3>Hỗ trợ LensStore</h3>
-            <p>Nhân viên trả lời trực tiếp</p>
+            <p>Nhân viên tư vấn trực tiếp</p>
         </div>
-        <button type="button" class="ls-chat-close" id="ls-chat-toggle-ai-btn" aria-label="Gặp nhân viên" style="width: auto; padding: 0 10px; font-size: 12px; background: rgba(0,0,0,0.2);"><i class="fa-solid fa-user-tie"></i> <span id="ls-chat-ai-status">Gặp nhân viên</span></button>
+        <span style="font-size: 11px; font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;">
+            <i class="fa-solid fa-circle" style="font-size: 7px;"></i> Trực tuyến
+        </span>
         <button type="button" class="ls-chat-close" id="ls-chat-close" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="ls-chat-product-bar" id="ls-chat-product-bar">
@@ -221,18 +223,8 @@
         <button type="button" id="ls-chat-product-clear" aria-label="Bỏ sản phẩm"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="ls-chat-body" id="ls-chat-messages">
-        @guest
-            <div class="ls-chat-guest">
-                <i class="fa-solid fa-lock" style="font-size:28px;color:#818cf8;display:block;margin-bottom:10px"></i>
-                Đăng nhập để chat với nhân viên về sản phẩm, bảo hành và đơn hàng.
-                <br>
-                <a href="{{ route('login') }}">Đăng nhập ngay</a>
-            </div>
-        @else
-            <div class="ls-chat-empty" id="ls-chat-loading"><i class="fa-solid fa-spinner fa-spin"></i>Đang tải hội thoại...</div>
-        @endguest
+        <div class="ls-chat-empty" id="ls-chat-loading"><i class="fa-solid fa-spinner fa-spin"></i>Đang tải hội thoại...</div>
     </div>
-    @auth
     <div id="ls-chat-img-preview" style="display: none; padding: 10px 14px; background: #f8fafc; border-top: 1px solid #e2e8f0; position: relative;">
         <img id="ls-chat-img-preview-img" src="" alt="Preview" style="max-height: 80px; border-radius: 8px; border: 1px solid #e2e8f0;">
         <button type="button" id="ls-chat-img-remove" style="position: absolute; top: 5px; left: 80px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; display: grid; place-items: center;"><i class="fa-solid fa-xmark" style="font-size: 12px;"></i></button>
@@ -245,13 +237,12 @@
         <button type="button" id="ls-chat-emoji-btn" style="background: none; border: none; cursor: pointer; padding: 8px 4px 8px 0; color: #64748b; font-size: 20px; transition: color 0.2s;" title="Biểu tượng cảm xúc" onmouseover="this.style.color='#4f46e5'" onmouseout="this.style.color='#64748b'">
             <i class="fa-regular fa-face-smile"></i>
         </button>
-        <input type="text" id="ls-chat-input" maxlength="2000" placeholder="Nhập tin nhắn..." autocomplete="off">
+        <input type="text" id="ls-chat-input" maxlength="2000" placeholder="Hỏi loại máy, giá bán hoặc nhắn tin..." autocomplete="off">
         <button type="button" id="ls-chat-send" aria-label="Gửi"><i class="fa-solid fa-paper-plane"></i></button>
     </div>
     <div id="ls-chat-emoji-picker-container" style="display: none; position: absolute; bottom: 65px; left: 10px; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; background: white;">
         <emoji-picker></emoji-picker>
     </div>
-    @endauth
 </div>
 
 <script>
@@ -266,11 +257,11 @@
     const productBar = document.getElementById('ls-chat-product-bar');
     const productLabel = document.getElementById('ls-chat-product-label');
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
-    const isAuth = {{ auth()->check() ? 'true' : 'false' }};
+    const isAuth = true;
     const urls = {
-        messages: @json(auth()->check() ? route('user.chat.messages') : null),
-        send: @json(auth()->check() ? route('user.chat.send') : null),
-        unread: @json(auth()->check() ? route('user.chat.unread') : null),
+        messages: '{{ route('user.chat.messages') }}',
+        send: '{{ route('user.chat.send') }}',
+        unread: '{{ route('user.chat.unread') }}',
     };
 
     let lastId = 0;
@@ -319,7 +310,7 @@
 
     function renderAll(messages) {
         if (!messages.length) {
-            box.innerHTML = `<div class="ls-chat-empty"><i class="fa-regular fa-comments"></i>Bắt đầu chat với nhân viên LensStore.<br><small>Hỏi thông số, bảo hành hoặc tình trạng hàng.</small></div>`;
+            box.innerHTML = `<div class="ls-chat-empty"><i class="fa-regular fa-comments"></i>Bắt đầu chat với LensStore.<br><small>Hỏi thông số, loại máy, giá bán hoặc bảo hành.</small></div>`;
             lastId = 0;
             return;
         }
@@ -409,6 +400,7 @@
             if (preview) preview.style.display = 'none';
 
             appendMessages([data]);
+            setTimeout(() => loadMessages(false), 350);
         } catch (e) {
             alert('Không gửi được tin nhắn. Vui lòng thử lại.');
         } finally {
@@ -437,54 +429,7 @@
         toggle.classList.remove('is-hidden');
     }
 
-    // Toggle AI Feature
-    let aiDisabled = false;
-    document.getElementById('ls-chat-toggle-ai-btn')?.addEventListener('click', async () => {
-        if (!isAuth) return;
-        aiDisabled = !aiDisabled;
-        
-        try {
-            await fetch('/user/chat/toggle-ai', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrf,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ disable_ai: aiDisabled })
-            });
-            
-            const statusText = document.getElementById('ls-chat-ai-status');
-            const toggleBtn = document.getElementById('ls-chat-toggle-ai-btn');
-            
-            if (aiDisabled) {
-                statusText.innerText = 'Gọi AI';
-                toggleBtn.style.background = '#ef4444'; // Red to indicate AI is off
-                
-                // Gửi một tin nhắn hệ thống
-                appendMessages([{
-                    id: 999999 + Date.now(),
-                    is_mine: false,
-                    content: "🧑‍💻 Đã kết nối với Nhân viên hỗ trợ. Bạn vui lòng đợi trong giây lát, nhân viên sẽ phản hồi ngay nhé!",
-                    sender_name: "Hệ thống",
-                    created_at: new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})
-                }]);
-            } else {
-                statusText.innerText = 'Gặp nhân viên';
-                toggleBtn.style.background = 'rgba(0,0,0,0.2)'; // Normal
-                
-                appendMessages([{
-                    id: 999999 + Date.now(),
-                    is_mine: false,
-                    content: "🤖 Trợ lý AI đã được bật trở lại.",
-                    sender_name: "Hệ thống",
-                    created_at: new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})
-                }]);
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    });
+
 
     toggle.addEventListener('click', () => openChat());
     closeBtn.addEventListener('click', closeChat);
