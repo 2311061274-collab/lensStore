@@ -92,7 +92,7 @@
             </div>
             
             @if($article->image_url)
-            <img src="{{ $article->image_url }}" alt="{{ $article->title }}" class="article-hero-img">
+            <img src="{{ $article->image_url ?? asset('uploads/products/canon_rf_50_f12.jpg') }}" alt="{{ $article->title }}" class="article-hero-img" onerror="this.onerror=null;this.src='{{ asset('uploads/products/canon_rf_50_f12.jpg') }}';">
             @endif
 
             <div class="article-content">

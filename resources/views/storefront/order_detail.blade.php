@@ -327,4 +327,22 @@
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    const isStatic = window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
+    if (!isStatic) return;
+
+    const cancelForm = document.querySelector('form[action*="/cancel"]');
+    if (cancelForm) {
+        cancelForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
+                alert('Đã hủy đơn hàng thành công.');
+                window.location.href = "{{ route('orders.index') }}";
+            }
+        });
+    }
+})();
+</script>
 @endsection

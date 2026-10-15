@@ -16,7 +16,7 @@
 
         /* PAGE HERO */
         .page-hero{background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%);color:white;padding:5rem 2.5rem;text-align:center;position:relative;overflow:hidden;}
-        .page-hero::before{content:'';position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1452780212461-0b3ee3e2cc2d?w=1600&auto=format&fit=crop&q=80') center/cover;opacity:0.1;}
+        .page-hero::before{content:'';position:absolute;inset:0;background:url('{{ asset('uploads/products/canon_rf_24_70.jpg') }}') center/cover;opacity:0.15;}
         .page-hero-inner{max-width:720px;margin:0 auto;position:relative;z-index:1;}
         .page-hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);padding:6px 14px;border-radius:50px;font-size:0.82rem;font-weight:500;margin-bottom:1.5rem;}
         .page-hero h1{font-size:3rem;font-weight:900;letter-spacing:-1.5px;margin-bottom:1rem;}
@@ -111,7 +111,7 @@
 @if($featuredArticle)
 <div class="featured-wrap">
     <div class="featured-article">
-        <img src="{{ $featuredArticle->image_url ?? 'https://images.unsplash.com/photo-1510127034890-ba27508e9f1c?w=800&auto=format&fit=crop&q=80' }}" alt="{{ $featuredArticle->title }}" class="featured-img">
+        <img src="{{ $featuredArticle->image_url ?? asset('uploads/products/canon_rf_50_f12.jpg') }}" alt="{{ $featuredArticle->title }}" class="featured-img" onerror="this.onerror=null;this.src='{{ asset('uploads/products/canon_rf_50_f12.jpg') }}';">
         <div class="featured-content">
             <span class="tag tag-{{ $featuredArticle->tag ?? 'review' }}"><i class="fa-solid fa-star"></i> {{ $featuredArticle->tag_text ?? 'Review chi tiết' }}</span>
             <h2>{{ $featuredArticle->title }}</h2>
@@ -148,7 +148,7 @@
                 @forelse($articles as $art)
                 <div class="article-card">
                     <div class="article-img-wrap">
-                        <img src="{{ $art->image_url ?? 'https://images.unsplash.com/photo-1617886759944-8e09b0f95f3c?w=600&auto=format&fit=crop&q=80' }}" alt="{{ $art->title }}" class="article-img">
+                        <img src="{{ $art->image_url ?? asset('uploads/products/canon_rf_50_f12.jpg') }}" alt="{{ $art->title }}" class="article-img" onerror="this.onerror=null;this.src='{{ asset('uploads/products/canon_rf_50_f12.jpg') }}';">
                         <div class="article-tag-overlay">
                             <span class="tag tag-{{ $art->tag ?? 'news' }}" style="margin:0;">{{ $art->tag_text ?? 'Tin tức' }}</span>
                         </div>
@@ -276,7 +276,7 @@ function fetchArticles(tag, page) {
             grid.innerHTML = data.articles.map(art => `
             <div class="article-card">
                 <div class="article-img-wrap">
-                    <img src="${art.image_url || 'https://images.unsplash.com/photo-1617886759944-8e09b0f95f3c?w=600&auto=format&fit=crop&q=80'}" alt="${escHtml(art.title)}" class="article-img" loading="lazy">
+                    <img src="${art.image_url || '{{ asset('uploads/products/canon_rf_50_f12.jpg') }}'}" alt="${escHtml(art.title)}" class="article-img" loading="lazy" onerror="this.onerror=null;this.src='{{ asset('uploads/products/canon_rf_50_f12.jpg') }}';">
                     <div class="article-tag-overlay">
                         <span class="tag tag-${art.tag || 'news'}" style="margin:0;">${escHtml(art.tag_text || 'Tin tức')}</span>
                     </div>

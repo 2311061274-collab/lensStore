@@ -21,9 +21,9 @@ return new class extends Migration
         // Điền request_code và trạng thái vận chuyển cho các return_requests đã có sẵn
         $existing = DB::table('return_requests')->orderBy('id')->get();
         foreach ($existing as $req) {
-            $code = 'RT-' . date('ymd', strtotime($req->created_at ?: now())) . '-' . str_pad($req->id, 4, '0', STR_PAD_LEFT);
-            $shippingStatus = !empty($req->tracking_code) ? 'tracking_assigned' : 'pending_tracking';
-            
+            $code = 'RT-'.date('ymd', strtotime($req->created_at ?: now())).'-'.str_pad($req->id, 4, '0', STR_PAD_LEFT);
+            $shippingStatus = ! empty($req->tracking_code) ? 'tracking_assigned' : 'pending_tracking';
+
             DB::table('return_requests')->where('id', $req->id)->update([
                 'request_code' => $code,
                 'return_shipping_status' => $shippingStatus,

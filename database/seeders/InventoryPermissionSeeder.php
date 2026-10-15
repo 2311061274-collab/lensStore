@@ -19,7 +19,7 @@ class InventoryPermissionSeeder extends Seeder
             $admin->givePermissionTo([
                 'manage_goods_receipts',
                 'manage_goods_issues',
-                'manage_qc_inspections'
+                'manage_qc_inspections',
             ]);
         }
     }

@@ -39,6 +39,11 @@
             <i class="fa-solid fa-check-circle"></i> {{ session('success') }}
         </div>
     @endif
+    @if(session('error'))
+        <div style="background: #fee2e2; color: #991b1b; padding: 1rem 1.5rem; border-radius: var(--radius-md); margin-bottom: 1.5rem; border: 1px solid #fca5a5;">
+            <i class="fa-solid fa-circle-exclamation"></i> {{ session('error') }}
+        </div>
+    @endif
 
     @if($orders->isEmpty())
         <div class="empty-state">
@@ -89,8 +94,19 @@
                 <div class="order-total">
                     Tổng: {{ number_format($order->total, 0, ',', '.') }} ₫
                 </div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    @if($order->status == 'completed')
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    @if(in_array($order->status, ['pending', 'preparing']))
+                        <form action="{{ route('orders.cancel', $order->id) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn hủy đơn hàng #{{ $order->order_code ?? $order->id }} không?');" style="margin:0;">
+                            @csrf
+                            <button type="submit" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:0.6rem 1rem; border-radius:var(--radius-md); font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">
+                                <i class="fa-solid fa-xmark"></i> Hủy đơn hàng
+                            </button>
+                        </form>
+                    @elseif($order->status == 'cancelled')
+                        <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:0.55rem 0.9rem; border-radius:var(--radius-md); font-weight:600; font-size:0.85rem; display:inline-flex; align-items:center; gap:5px;">
+                            <i class="fa-solid fa-ban"></i> Đã hủy
+                        </span>
+                    @elseif($order->status == 'completed')
                         <a href="{{ route('orders.review', $order->id) }}" style="text-decoration:none; background:var(--surface); color:var(--primary); border:1px solid var(--primary); padding:0.6rem 1rem; border-radius:var(--radius-md); font-weight:600; cursor:pointer;">Đánh giá</a>
                         
                         <a href="{{ route('orders.return', $order->id) }}" style="text-decoration:none; background:var(--surface); color:var(--text-main); border:1px solid var(--border); padding:0.6rem 1rem; border-radius:var(--radius-md); font-weight:600; cursor:pointer;">Trả hàng/Hoàn tiền</a>
@@ -193,7 +209,16 @@
                                     <i class="fa-solid fa-credit-card"></i> ${ord.payment_method}
                                 </div>
                             </div>
-                            <div style="display:flex; gap:8px;">
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                ${(ord.status === 'cancelled') ? `
+                                    <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:6px 12px; border-radius:8px; font-size:0.85rem; font-weight:600; display:inline-flex; align-items:center; gap:5px;">
+                                        <i class="fa-solid fa-ban"></i> Đã hủy
+                                    </span>
+                                ` : `
+                                    <button type="button" onclick="cancelDemoOrder('${ord.order_code}')" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:6px 12px; border-radius:8px; font-weight:600; font-size:0.85rem; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">
+                                        <i class="fa-solid fa-xmark"></i> Hủy đơn hàng
+                                    </button>
+                                `}
                                 <span style="font-size:0.85rem; color:#10b981; font-weight:600; padding:6px 12px; background:#dcfce7; border-radius:8px; display:inline-flex; align-items:center; gap:5px;">
                                     <i class="fa-solid fa-shield-check"></i> Đã bảo vệ đơn hàng
                                 </span>
@@ -214,6 +239,25 @@
     } catch(e) {
         console.warn('Orders localStorage load error:', e);
     }
+
+    // Hàm hủy đơn hàng demo cho môi trường tĩnh (GitHub Pages)
+    window.cancelDemoOrder = function(orderCode) {
+        if (!confirm('Bạn có chắc chắn muốn hủy đơn hàng #' + orderCode + '?')) return;
+        try {
+            let orders = JSON.parse(localStorage.getItem('ls_orders') || '[]');
+            const target = orders.find(o => o.order_code === orderCode);
+            if (target) {
+                target.status = 'cancelled';
+                target.status_label = 'Đã hủy';
+                target.status_color = '#ef4444';
+                localStorage.setItem('ls_orders', JSON.stringify(orders));
+                alert('Đã hủy đơn hàng #' + orderCode + ' thành công.');
+                window.location.reload();
+            }
+        } catch(e) {
+            console.error('Lỗi khi hủy đơn hàng demo:', e);
+        }
+    };
 })();
 </script>
 @endsection
