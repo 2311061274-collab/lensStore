@@ -258,11 +258,54 @@
     const productLabel = document.getElementById('ls-chat-product-label');
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
     const isAuth = true;
+    const isStaticSite = window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
     const urls = {
         messages: '{{ route('user.chat.messages', [], false) }}',
         send: '{{ route('user.chat.send', [], false) }}',
         unread: '{{ route('user.chat.unread', [], false) }}',
     };
+    const STORAGE_KEY = 'ls_customer_chat_messages';
+
+    function getStoredMessages() {
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveStoredMessage(msg) {
+        try {
+            const list = getStoredMessages();
+            list.push(msg);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(-50)));
+        } catch (e) {
+            console.warn('Chat localStorage save error:', e);
+        }
+    }
+
+    function getOfflineReply(text, product) {
+        const raw = (text || '').toLowerCase();
+        const norm = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const matchAny = (list) => list.some(k => raw.includes(k) || norm.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+
+        if (matchAny(['gia', 'bao nhieu', 'chi phi', 'nhieu tien', 'cost', 'price', 'tri gia'])) {
+            if (product && product.name) {
+                return `Dạ, mẫu ống kính "${product.name}" tại LensStore hiện có mức giá cực kỳ ưu đãi, bảo hành chính hãng 24 tháng và hỗ trợ đổi mới trong 30 ngày. Quý khách có thể bấm "Mua ngay" hoặc thêm vào giỏ hàng để áp dụng mã giảm giá tốt nhất nhé!`;
+            }
+            return 'Dạ các dòng ống kính tại LensStore có mức giá ưu đãi từ khoảng 3.000.000 ₫ đến hơn 50.000.000 ₫ tùy thuộc vào thương hiệu (Sony, Canon, Nikon, Fujifilm, Tamron, Sigma). Bạn đang quan tâm mẫu ống kính nào để LensStore báo giá chi tiết ạ?';
+        }
+
+        if (matchAny(['loai may', 'may anh', 'ngam', 'body', 'tuong thich', 'sony', 'canon', 'nikon', 'fujifilm', 'fuji', 'lumix'])) {
+            return 'Dạ LensStore cung cấp đầy đủ ống kính chính hãng cho các dòng máy ảnh Sony (ngàm E), Canon (ngàm RF/EF), Nikon (ngàm Z), Fujifilm (ngàm X)... Bạn đang sử dụng thân máy (body) loại nào để LensStore tư vấn tiêu cự và ngàm tương thích chuẩn nhất ạ?';
+        }
+
+        if (matchAny(['chao', 'hello', 'hi', 'alo', 'ad', 'shop'])) {
+            return 'Kính chào Quý khách! LensStore rất vui được hỗ trợ. Quý khách cần tư vấn về loại máy, thông số quang học hay giá bán ống kính ạ?';
+        }
+
+        return 'Cảm ơn Quý khách đã nhắn tin! Nhân viên tư vấn LensStore đã tiếp nhận và sẽ hỗ trợ ngay. Quý khách cũng có thể hỏi nhanh về "loại máy" hoặc "giá" để được giải đáp tức thì ạ.';
+    }
 
     let lastId = 0;
     let loaded = false;
@@ -336,7 +379,23 @@
     });
 
     async function loadMessages(full) {
-        if (!isAuth || !urls.messages) return;
+        if (!isAuth) return;
+
+        if (isStaticSite) {
+            const stored = getStoredMessages();
+            renderAll(stored);
+            loaded = true;
+            setBadge(0);
+            return;
+        }
+
+        if (!urls.messages) {
+            const stored = getStoredMessages();
+            renderAll(stored);
+            loaded = true;
+            return;
+        }
+
         try {
             const params = new URLSearchParams();
             if (!full && lastId) params.set('since_id', String(lastId));
@@ -346,7 +405,8 @@
             });
             if (!res.ok) {
                 if (!loaded) {
-                    renderAll([]);
+                    const stored = getStoredMessages();
+                    renderAll(stored);
                     loaded = true;
                 }
                 return;
@@ -363,14 +423,15 @@
         } catch (e) {
             console.warn('Chat loadMessages error:', e);
             if (!loaded) {
-                renderAll([]);
+                const stored = getStoredMessages();
+                renderAll(stored);
                 loaded = true;
             }
         }
     }
 
     async function loadUnread() {
-        if (!isAuth || !urls.unread || panel.classList.contains('is-open')) return;
+        if (isStaticSite || !isAuth || !urls.unread || panel.classList.contains('is-open')) return;
         try {
             const res = await fetch(urls.unread, { headers: { 'Accept': 'application/json' } });
             if (!res.ok) return;
@@ -378,6 +439,56 @@
             setBadge(data.unread || 0);
         } catch (e) {
             // Ignore polling errors
+        }
+    }
+
+    function handleClientSideSend(text, file) {
+        function completeSend(imgDataUrl) {
+            const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            const userMsg = {
+                id: Date.now(),
+                sender_name: 'Bạn',
+                content: text || '',
+                is_mine: true,
+                created_at: nowTime,
+                product: (productId && productName) ? { id: productId, name: productName, url: window.location.href } : null,
+                image_url: imgDataUrl || null
+            };
+
+            appendMessages([userMsg]);
+            saveStoredMessage(userMsg);
+
+            input.value = '';
+            const imgInputElem = document.getElementById('ls-chat-img-input');
+            if (imgInputElem) imgInputElem.value = '';
+            const preview = document.getElementById('ls-chat-img-preview');
+            if (preview) preview.style.display = 'none';
+
+            // Phản hồi tự động offline sau 500ms
+            setTimeout(() => {
+                const prodInfo = (productId && productName) ? { id: productId, name: productName } : null;
+                const replyText = getOfflineReply(text, prodInfo);
+                const replyMsg = {
+                    id: Date.now() + 1,
+                    sender_name: 'Nhân viên LensStore',
+                    content: replyText,
+                    is_mine: false,
+                    created_at: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                    product: null,
+                    image_url: null
+                };
+                appendMessages([replyMsg]);
+                saveStoredMessage(replyMsg);
+            }, 500);
+        }
+
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => completeSend(e.target.result);
+            reader.onerror = () => completeSend(null);
+            reader.readAsDataURL(file);
+        } else {
+            completeSend(null);
         }
     }
 
@@ -393,6 +504,11 @@
         input.disabled = true;
 
         try {
+            if (isStaticSite) {
+                handleClientSideSend(text, file);
+                return;
+            }
+
             const formData = new FormData();
             if (text) formData.append('message', text);
             if (productId) formData.append('product_id', productId);
@@ -406,12 +522,15 @@
                 },
                 body: formData
             });
-            const data = await res.json();
+
             if (!res.ok) {
-                alert(data.error || data.message || 'Không gửi được tin nhắn.');
+                // Fallback mượt mà nếu máy chủ trả về lỗi (404/405)
+                console.warn('Server chat returned error status', res.status, '- switching to client-side');
+                handleClientSideSend(text, file);
                 return;
             }
-            
+
+            const data = await res.json();
             input.value = '';
             if (imgInputElem) imgInputElem.value = '';
             const preview = document.getElementById('ls-chat-img-preview');
@@ -420,7 +539,8 @@
             appendMessages([data]);
             setTimeout(() => loadMessages(false), 350);
         } catch (e) {
-            alert('Không gửi được tin nhắn. Vui lòng thử lại.');
+            console.warn('Chat send network error, fallback to client-side:', e);
+            handleClientSideSend(text, file);
         } finally {
             sending = false;
             sendBtn.disabled = false;
@@ -463,10 +583,12 @@
 
     if (isAuth) {
         loadUnread();
-        setInterval(() => {
-            if (panel.classList.contains('is-open')) loadMessages(false);
-            else loadUnread();
-        }, 2500);
+        if (!isStaticSite) {
+            setInterval(() => {
+                if (panel.classList.contains('is-open')) loadMessages(false);
+                else loadUnread();
+            }, 2500);
+        }
 
         // Setup image preview & emojis
         const imgInput = document.getElementById('ls-chat-img-input');
