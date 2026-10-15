@@ -23,7 +23,7 @@ class NewsImageTest extends TestCase
             'read_time' => 5,
         ]);
 
-        $this->assertStringContainsString('uploads/products/canon_rf_50_f12.jpg', $news->image_url);
+        $this->assertStringContainsString('uploads/products/1790239840_6ab4e4606a454.jpg', $news->image_url);
     }
 
     public function test_news_page_loads_successfully_with_project_images(): void
@@ -32,7 +32,7 @@ class NewsImageTest extends TestCase
             'title' => 'Sony FE 85mm f/1.4 GM II — Ống kính chân dung',
             'description' => 'Mô tả bài viết Sony',
             'content' => 'Nội dung chi tiết',
-            'image_url' => '/uploads/products/sony_50_f12_gm.jpg',
+            'image_url' => '/uploads/products/1790238927_6ab4e0cfb31a4.jpg',
             'tag' => 'review',
             'tag_text' => 'Review',
             'author' => 'Admin',
@@ -43,7 +43,7 @@ class NewsImageTest extends TestCase
         $response = $this->get(route('storefront.news'));
 
         $response->assertStatus(200);
-        $response->assertSee('uploads/products/sony_50_f12_gm.jpg');
+        $response->assertSee('uploads/products/1790238927_6ab4e0cfb31a4.jpg');
         $response->assertSee('onerror="this.onerror=null;', false);
     }
 
@@ -53,7 +53,7 @@ class NewsImageTest extends TestCase
             'title' => '7 kỹ thuật bố cục ảnh đẹp',
             'description' => 'Mô tả bố cục',
             'content' => 'Nội dung bố cục',
-            'image_url' => '/uploads/products/canon_rf_24_70.jpg',
+            'image_url' => '/uploads/products/1790239745_6ab4e4017e75b.jpg',
             'tag' => 'tips',
             'tag_text' => 'Mẹo',
             'author' => 'Admin',

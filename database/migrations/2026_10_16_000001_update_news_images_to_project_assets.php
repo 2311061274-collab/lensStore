@@ -11,16 +11,16 @@ return new class extends Migration
     public function up(): void
     {
         $mappings = [
-            'Canon RF 50mm' => '/uploads/products/canon_rf_50_f12.jpg',
-            'Sony FE 85mm' => '/uploads/products/sony_50_f12_gm.jpg',
-            '7 kỹ thuật bố cục' => '/uploads/products/canon_rf_24_70.jpg',
-            'Sigma 35mm' => '/uploads/products/sigma_24_70_art2.jpg',
-            'Nikon Z 135mm' => '/uploads/products/nikon_z_85_f12.jpg',
-            'Cách chọn ống kính' => '/uploads/products/nikon_z_14_24.jpg',
-            'Tamron 150-500mm' => '/uploads/products/tamron_28_75_g2.jpg',
-            'Hiểu về khẩu độ' => '/uploads/products/canon_rf_100_macro.jpg',
-            'Fujifilm X100VI' => '/uploads/products/fuji_xf_56_f12.jpg',
-            '10 lỗi phổ biến' => '/uploads/products/sony_70_200_gm2.jpg',
+            'Canon RF 50mm' => '/uploads/products/1790239840_6ab4e4606a454.jpg',
+            'Sony FE 85mm' => '/uploads/products/1790238927_6ab4e0cfb31a4.jpg',
+            '7 kỹ thuật bố cục' => '/uploads/products/1790239745_6ab4e4017e75b.jpg',
+            'Sigma 35mm' => '/uploads/products/1790239920_6ab4e4b09fb1b.webp',
+            'Nikon Z 135mm' => '/uploads/products/1790239033_6ab4e13977f56.jpg',
+            'Cách chọn ống kính' => '/uploads/products/1790239894_6ab4e496c050f.png',
+            'Tamron 150-500mm' => '/uploads/products/1790239588_6ab4e364e6779.jpg',
+            'Hiểu về khẩu độ' => '/uploads/products/1790238799_6ab4e04f0d3bd.jpg',
+            'Fujifilm X100VI' => '/uploads/products/1790239680_6ab4e3c0e3fa1.webp',
+            '10 lỗi phổ biến' => '/uploads/products/1790239717_6ab4e3e58da2f.png',
         ];
 
         foreach ($mappings as $titleKeyword => $imagePath) {
@@ -34,7 +34,7 @@ return new class extends Migration
             ->whereNull('image_url')
             ->orWhere('image_url', '')
             ->orWhere('image_url', 'like', '/storage/%')
-            ->update(['image_url' => '/uploads/products/canon_rf_50_f12.jpg']);
+            ->update(['image_url' => '/uploads/products/1790239840_6ab4e4606a454.jpg']);
     }
 
     /**
