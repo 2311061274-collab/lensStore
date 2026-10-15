@@ -340,7 +340,14 @@
                                 <i class="fa-solid fa-eye" style="font-size:0.82rem;"></i>
                             </a>
                             @if($product->stock > 0 && $product->status == 'in_stock')
-                            <button type="button" class="add-to-cart-btn" data-id="{{ $product->id }}" style="display:inline-flex; align-items:center; gap:6px; padding:0 14px; height:36px; background:var(--primary); color:white; border:none; border-radius:10px; font-weight:700; font-size:0.82rem; cursor:pointer; font-family:inherit; transition:all 0.2s;" onmouseover="this.style.background='#4338ca'; this.style.transform='scale(1.03)';" onmouseout="this.style.background='var(--primary)'; this.style.transform='scale(1)';" title="Thêm vào giỏ">
+                            <button type="button" class="add-to-cart-btn" 
+                                data-id="{{ $product->id }}"
+                                data-name="{{ $product->name }}"
+                                data-price="{{ $product->price }}"
+                                data-price-formatted="{{ $product->formatted_price }}"
+                                data-image="{{ $product->image_url }}"
+                                data-url="{{ route('storefront.show', $product->id) }}"
+                                style="display:inline-flex; align-items:center; gap:6px; padding:0 14px; height:36px; background:var(--primary); color:white; border:none; border-radius:10px; font-weight:700; font-size:0.82rem; cursor:pointer; font-family:inherit; transition:all 0.2s;" onmouseover="this.style.background='#4338ca'; this.style.transform='scale(1.03)';" onmouseout="this.style.background='var(--primary)'; this.style.transform='scale(1)';" title="Thêm vào giỏ">
                                 <i class="fa-solid fa-cart-plus" style="font-size:0.85rem;"></i> Thêm
                             </button>
                             @else
@@ -464,38 +471,77 @@
     const csrfToken = '{{ csrf_token() }}';
 
     // ===== GIỎ HÀNG =====
+    function addProductToClientCart(product) {
+        let items = [];
+        try {
+            items = JSON.parse(localStorage.getItem('ls_cart_items') || '[]');
+        } catch(e) { items = []; }
+
+        const existingIndex = items.findIndex(it => String(it.product_id) === String(product.id) || String(it.id) === String(product.id));
+        if (existingIndex > -1) {
+            items[existingIndex].quantity = (parseInt(items[existingIndex].quantity) || 1) + 1;
+        } else {
+            items.push({
+                id: product.id,
+                product_id: product.id,
+                name: product.name,
+                price: parseFloat(product.price) || 0,
+                price_formatted: product.price_formatted || (new Intl.NumberFormat('vi-VN').format(product.price) + ' ₫'),
+                image: product.image || '',
+                url: product.url || '#',
+                quantity: 1,
+                is_selected: true
+            });
+        }
+
+        const totalCount = items.reduce((acc, it) => acc + (parseInt(it.quantity) || 1), 0);
+        localStorage.setItem('ls_cart_items', JSON.stringify(items));
+        localStorage.setItem('ls_cart_count', totalCount.toString());
+
+        const badge = document.getElementById('cart-count');
+        if (badge) {
+            badge.textContent = totalCount;
+            badge.style.display = totalCount > 0 ? '' : 'none';
+        }
+        document.querySelectorAll('.sf-cart-dropdown span, .sf-cart-badge').forEach(el => {
+            el.textContent = totalCount;
+            el.style.display = totalCount > 0 ? '' : 'none';
+        });
+    }
+
     document.querySelectorAll('.add-to-cart-btn').forEach(button => {
         button.addEventListener('click', function(e) {
             e.preventDefault();
-            if (!isLoggedIn) {
-                alert('Vui lòng đăng nhập hoặc đăng ký để thêm sản phẩm vào giỏ hàng.');
-                window.location.href = "{{ route('login') }}";
-                return;
+            const product = {
+                id: this.dataset.id,
+                name: this.dataset.name || this.closest('.product-card, div[style*="border-radius:16px"]')?.querySelector('a[style*="font-size:1rem"]')?.textContent?.trim() || '',
+                price: parseFloat(this.dataset.price) || 0,
+                price_formatted: this.dataset.priceFormatted || '',
+                image: this.dataset.image || this.closest('.product-card, div[style*="border-radius:16px"]')?.querySelector('img')?.src || '',
+                url: this.dataset.url || this.closest('.product-card, div[style*="border-radius:16px"]')?.querySelector('a')?.href || '#'
+            };
+
+            addProductToClientCart(product);
+
+            const originalHtml = this.innerHTML;
+            this.innerHTML = '<i class="fa-solid fa-check"></i> Đã thêm';
+            this.style.background = '#10b981';
+            setTimeout(() => {
+                this.innerHTML = originalHtml;
+                this.style.background = '';
+            }, 1500);
+
+            if (isLoggedIn) {
+                fetch("{{ route('cart.add') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ product_id: product.id, quantity: 1 })
+                }).catch(() => {});
             }
-
-            const productId = this.getAttribute('data-id');
-            const quantity = 1;
-
-            fetch("{{ route('cart.add') }}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ product_id: productId, quantity: quantity })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const cartCountEl = document.getElementById('cart-count');
-                    if (cartCountEl) cartCountEl.textContent = data.cartCount;
-                    alert('Đã thêm ' + quantity + ' sản phẩm vào giỏ hàng thành công!');
-                } else {
-                    alert('Có lỗi xảy ra, vui lòng thử lại.');
-                }
-            })
-            .catch(() => alert('Có lỗi xảy ra, vui lòng thử lại.'));
         });
     });
 

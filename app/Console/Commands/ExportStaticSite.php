@@ -491,9 +491,26 @@ class ExportStaticSite extends Command
 
     // 1. Đồng bộ số lượng giỏ hàng trên Navbar từ localStorage
     function syncCartCount() {
-        const count = parseInt(localStorage.getItem('ls_cart_count') || '1', 10);
-        document.querySelectorAll('#cart-count, .sf-cart-dropdown span').forEach(el => {
-            if (el) el.textContent = count;
+        let count = 0;
+        try {
+            const items = JSON.parse(localStorage.getItem('ls_cart_items') || '[]');
+            if (Array.isArray(items) && items.length > 0) {
+                count = items.reduce((acc, it) => acc + (parseInt(it.quantity) || 1), 0);
+                localStorage.setItem('ls_cart_count', count.toString());
+            } else if (localStorage.getItem('ls_cart_count') !== null) {
+                count = parseInt(localStorage.getItem('ls_cart_count'), 10) || 0;
+            } else {
+                count = 1;
+            }
+        } catch(e) {
+            count = parseInt(localStorage.getItem('ls_cart_count') || '1', 10);
+        }
+
+        document.querySelectorAll('#cart-count, .sf-cart-dropdown span, .sf-cart-badge').forEach(el => {
+            if (el) {
+                el.textContent = count;
+                el.style.display = count > 0 ? '' : 'none';
+            }
         });
     }
 
@@ -504,9 +521,63 @@ class ExportStaticSite extends Command
                 e.preventDefault();
                 e.stopPropagation();
                 
-                let currentCount = parseInt(localStorage.getItem('ls_cart_count') || '1', 10);
-                currentCount += 1;
-                localStorage.setItem('ls_cart_count', currentCount);
+                const card = this.closest('.product-card, .cta-buttons, .product-container, body');
+                const id = this.dataset.id || ('prod_' + Date.now());
+                const name = this.dataset.name || card?.querySelector('.product-name, h1, a[href*="product"]')?.textContent?.trim() || 'Ống kính máy ảnh';
+                let price = parseFloat(this.dataset.price) || 0;
+                let priceFormatted = this.dataset.priceFormatted || '';
+
+                if (!price) {
+                    const priceText = card?.querySelector('.product-price, .price-val, div[style*="font-size:1.25rem"], div[style*="color:#ef4444"]')?.textContent || '';
+                    const match = priceText.replace(/[^\d]/g, '');
+                    if (match) price = parseFloat(match);
+                }
+                if (!priceFormatted && price) {
+                    priceFormatted = new Intl.NumberFormat('vi-VN').format(price) + ' ₫';
+                }
+
+                let image = this.dataset.image || card?.querySelector('.product-img, .main-img, img')?.src || '';
+                const url = this.dataset.url || card?.querySelector('a[href*="product"], a[href*="san-pham"]')?.href || (BASE_URL + '/product/' + id);
+
+                let items = [];
+                try {
+                    items = JSON.parse(localStorage.getItem('ls_cart_items') || '[]');
+                } catch(err) { items = []; }
+
+                if (items.length === 0 && localStorage.getItem('ls_cart_count') === null) {
+                    items.push({
+                        id: '1',
+                        product_id: '1',
+                        name: 'Sony FE 24-70mm f/2.8 GM II',
+                        price: 49990000,
+                        price_formatted: '49.990.000 ₫',
+                        image: BASE_URL + '/uploads/products/1790238752_6ab4e020869c1.jpg',
+                        url: BASE_URL + '/product/1',
+                        quantity: 1,
+                        is_selected: true
+                    });
+                }
+
+                const existingIndex = items.findIndex(it => String(it.product_id) === String(id) || String(it.id) === String(id));
+                if (existingIndex > -1) {
+                    items[existingIndex].quantity = (parseInt(items[existingIndex].quantity) || 1) + 1;
+                } else {
+                    items.push({
+                        id: id,
+                        product_id: id,
+                        name: name,
+                        price: price,
+                        price_formatted: priceFormatted,
+                        image: image,
+                        url: url,
+                        quantity: 1,
+                        is_selected: true
+                    });
+                }
+
+                const totalCount = items.reduce((acc, it) => acc + (parseInt(it.quantity) || 1), 0);
+                localStorage.setItem('ls_cart_items', JSON.stringify(items));
+                localStorage.setItem('ls_cart_count', totalCount.toString());
                 syncCartCount();
 
                 const originalHtml = this.innerHTML;
@@ -708,14 +779,26 @@ class ExportStaticSite extends Command
                     ? `<a href="\${BASE_URL}/admin/" class="sf-admin-btn" style="text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;transition:all 0.2s;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;"><i class="fa-solid fa-gauge"></i> Quản lý</a>`
                     : '';
                 const initial = name ? name.charAt(0).toUpperCase() : (role === 'admin' ? 'A' : 'K');
-                const cartCount = parseInt(localStorage.getItem('ls_cart_count') || '1', 10);
+                let cartCount = 0;
+                try {
+                    const items = JSON.parse(localStorage.getItem('ls_cart_items') || '[]');
+                    if (Array.isArray(items) && items.length > 0) {
+                        cartCount = items.reduce((acc, it) => acc + (parseInt(it.quantity) || 1), 0);
+                    } else if (localStorage.getItem('ls_cart_count') !== null) {
+                        cartCount = parseInt(localStorage.getItem('ls_cart_count'), 10) || 0;
+                    } else {
+                        cartCount = 1;
+                    }
+                } catch(e) {
+                    cartCount = parseInt(localStorage.getItem('ls_cart_count') || '1', 10);
+                }
 
                 authContainer.innerHTML = `
                     \${adminLink}
                     <div class="sf-cart-dropdown" style="position:relative;display:inline-block;">
                         <a href="\${BASE_URL}/cart/" style="position:relative;cursor:pointer;text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;transition:all 0.2s;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;">
                             <i class="fa-solid fa-cart-shopping"></i> Giỏ hàng
-                            <span style="position:absolute;top:-4px;right:-2px;background:#ef4444;color:white;border-radius:50%;padding:1px 5px;font-size:0.65rem;font-weight:700;line-height:1.4;">\${cartCount}</span>
+                            <span id="cart-count" class="sf-cart-badge" style="position:absolute;top:-4px;right:-2px;background:#ef4444;color:white;border-radius:50%;padding:1px 5px;font-size:0.65rem;font-weight:700;line-height:1.4;\${cartCount > 0 ? '' : 'display:none;'}">\${cartCount}</span>
                         </a>
                     </div>
                     <a href="\${BASE_URL}/orders/" style="text-decoration:none;color:var(--text-muted,#64748b);font-weight:500;padding:6px 12px;border-radius:8px;font-size:0.9rem;"><i class="fa-solid fa-clipboard-list"></i> Đơn hàng</a>

@@ -141,7 +141,13 @@
                             <div class="wishlist-price">{{ $item->product->formatted_price }}</div>
                             
                             <div class="wishlist-actions">
-                                <button class="btn-cart add-to-cart-btn" data-id="{{ $item->product->id }}">
+                                <button class="btn-cart add-to-cart-btn" 
+                                    data-id="{{ $item->product->id }}"
+                                    data-name="{{ $item->product->name }}"
+                                    data-price="{{ $item->product->price }}"
+                                    data-price-formatted="{{ $item->product->formatted_price }}"
+                                    data-image="{{ $item->product->image_url }}"
+                                    data-url="{{ route('storefront.show', $item->product->id) }}">
                                     <i class="fa-solid fa-cart-plus"></i> Thêm giỏ
                                 </button>
                                 <button class="btn-remove toggle-wishlist-btn" data-id="{{ $item->product->id }}" title="Bỏ yêu thích">
@@ -169,26 +175,72 @@
     const csrfToken = '{{ csrf_token() }}';
     const isLoggedIn = true; // Vì route này nằm trong auth nên luôn true
 
+    function addToClientCart(product) {
+        let items = [];
+        try {
+            items = JSON.parse(localStorage.getItem('ls_cart_items') || '[]');
+        } catch(e) { items = []; }
+
+        const existingIndex = items.findIndex(it => String(it.product_id) === String(product.id) || String(it.id) === String(product.id));
+        if (existingIndex > -1) {
+            items[existingIndex].quantity = (parseInt(items[existingIndex].quantity) || 1) + 1;
+        } else {
+            items.push({
+                id: product.id,
+                product_id: product.id,
+                name: product.name,
+                price: parseFloat(product.price) || 0,
+                price_formatted: product.price_formatted || (new Intl.NumberFormat('vi-VN').format(product.price) + ' ₫'),
+                image: product.image || '',
+                url: product.url || '#',
+                quantity: 1,
+                is_selected: true
+            });
+        }
+
+        const totalCount = items.reduce((acc, it) => acc + (parseInt(it.quantity) || 1), 0);
+        localStorage.setItem('ls_cart_items', JSON.stringify(items));
+        localStorage.setItem('ls_cart_count', totalCount.toString());
+
+        const badge = document.getElementById('cart-count');
+        if (badge) {
+            badge.textContent = totalCount;
+            badge.style.display = totalCount > 0 ? '' : 'none';
+        }
+        document.querySelectorAll('.sf-cart-dropdown span, .sf-cart-badge').forEach(el => {
+            el.textContent = totalCount;
+            el.style.display = totalCount > 0 ? '' : 'none';
+        });
+    }
+
     // Xử lý nút giỏ hàng
     document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
-            const productId = this.getAttribute('data-id');
+            const product = {
+                id: this.dataset.id,
+                name: this.dataset.name || this.closest('.wishlist-card')?.querySelector('.wishlist-name')?.textContent?.trim() || '',
+                price: parseFloat(this.dataset.price) || 0,
+                price_formatted: this.dataset.priceFormatted || '',
+                image: this.dataset.image || this.closest('.wishlist-card')?.querySelector('img')?.src || '',
+                url: this.dataset.url || this.closest('.wishlist-card')?.querySelector('a')?.href || '#'
+            };
+
+            addToClientCart(product);
+
+            const originalHtml = this.innerHTML;
+            this.innerHTML = '<i class="fa-solid fa-check"></i> Đã thêm';
+            this.style.background = '#10b981';
+            setTimeout(() => {
+                this.innerHTML = originalHtml;
+                this.style.background = '';
+            }, 1500);
+
             fetch("{{ route('cart.add') }}", {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-                body: JSON.stringify({ product_id: productId, quantity: 1 })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) {
-                    alert('Đã thêm sản phẩm vào giỏ hàng!');
-                    let countEl = document.getElementById('cart-count');
-                    if(countEl) countEl.innerText = data.cartCount;
-                } else {
-                    alert('Lỗi!');
-                }
-            });
+                body: JSON.stringify({ product_id: product.id, quantity: 1 })
+            }).catch(() => {});
         });
     });
 

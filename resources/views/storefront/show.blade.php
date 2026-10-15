@@ -263,7 +263,14 @@
             <button class="btn-buy buy-now-btn" data-id="{{ $product->id }}" style="background: linear-gradient(135deg, #f97316, #ea580c); margin-bottom: -4px;">
                 <i class="fa-solid fa-bolt"></i> Mua ngay
             </button>
-            <button class="btn-buy add-to-cart-btn" data-id="{{ $product->id }}" style="background: var(--surface); color: var(--primary); border: 2px solid var(--primary);">
+            <button class="btn-buy add-to-cart-btn" 
+                data-id="{{ $product->id }}"
+                data-name="{{ $product->name }}"
+                data-price="{{ $product->price }}"
+                data-price-formatted="{{ $product->formatted_price }}"
+                data-image="{{ $product->image_url }}"
+                data-url="{{ route('storefront.show', $product->id) }}"
+                style="background: var(--surface); color: var(--primary); border: 2px solid var(--primary);">
                 <i class="fa-solid fa-cart-plus"></i> Thêm vào giỏ hàng
             </button>
             @php
@@ -394,46 +401,84 @@
     const isLoggedIn = {{ Auth::check() ? 'true' : 'false' }};
     const csrfToken = '{{ csrf_token() }}';
 
+    function addProductToClientCart(product) {
+        let items = [];
+        try {
+            items = JSON.parse(localStorage.getItem('ls_cart_items') || '[]');
+        } catch(e) { items = []; }
+
+        const existingIndex = items.findIndex(it => String(it.product_id) === String(product.id) || String(it.id) === String(product.id));
+        if (existingIndex > -1) {
+            items[existingIndex].quantity = (parseInt(items[existingIndex].quantity) || 1) + 1;
+        } else {
+            items.push({
+                id: product.id,
+                product_id: product.id,
+                name: product.name,
+                price: parseFloat(product.price) || 0,
+                price_formatted: product.price_formatted || (new Intl.NumberFormat('vi-VN').format(product.price) + ' ₫'),
+                image: product.image || '',
+                url: product.url || '#',
+                quantity: 1,
+                is_selected: true
+            });
+        }
+
+        const totalCount = items.reduce((acc, it) => acc + (parseInt(it.quantity) || 1), 0);
+        localStorage.setItem('ls_cart_items', JSON.stringify(items));
+        localStorage.setItem('ls_cart_count', totalCount.toString());
+
+        const badge = document.getElementById('cart-count');
+        if (badge) {
+            badge.textContent = totalCount;
+            badge.style.display = totalCount > 0 ? '' : 'none';
+        }
+        document.querySelectorAll('.sf-cart-dropdown span, .sf-cart-badge').forEach(el => {
+            el.textContent = totalCount;
+            el.style.display = totalCount > 0 ? '' : 'none';
+        });
+    }
+
     document.querySelectorAll('.add-to-cart-btn').forEach(button => {
         button.addEventListener('click', function(e) {
             e.preventDefault();
-            if (!isLoggedIn) {
-                alert('Vui lòng đăng nhập hoặc đăng ký để thêm sản phẩm vào giỏ hàng.');
-                window.location.href = "{{ route('login') }}";
-                return;
-            }
+            const product = {
+                id: this.dataset.id,
+                name: this.dataset.name || document.querySelector('h1')?.textContent?.trim() || '',
+                price: parseFloat(this.dataset.price) || 0,
+                price_formatted: this.dataset.priceFormatted || '',
+                image: this.dataset.image || document.querySelector('.main-img, .product-hero img, img')?.src || '',
+                url: this.dataset.url || window.location.href
+            };
 
-            const productId = this.getAttribute('data-id');
-            const quantity = 1; // Số lượng mặc định, điều chỉnh trong giỏ hàng
-            
-            fetch("{{ route('cart.add') }}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    product_id: productId,
-                    quantity: quantity
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if(data.success) {
-                    const cartCountEl = document.getElementById('cart-count');
-                    if(cartCountEl) {
-                        cartCountEl.textContent = data.cartCount;
-                    }
-                    alert('Đã thêm ' + quantity + ' sản phẩm vào giỏ hàng thành công!');
-                } else {
-                    alert('Có lỗi xảy ra, vui lòng thử lại.');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Có lỗi xảy ra, vui lòng thử lại.');
-            });
+            addProductToClientCart(product);
+
+            const originalHtml = this.innerHTML;
+            this.innerHTML = '<i class="fa-solid fa-check"></i> Đã thêm vào giỏ!';
+            this.style.background = '#10b981';
+            this.style.color = '#ffffff';
+            this.style.borderColor = '#10b981';
+            setTimeout(() => {
+                this.innerHTML = originalHtml;
+                this.style.background = 'var(--surface)';
+                this.style.color = 'var(--primary)';
+                this.style.borderColor = 'var(--primary)';
+            }, 1500);
+
+            if (isLoggedIn) {
+                fetch("{{ route('cart.add') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        product_id: product.id,
+                        quantity: 1
+                    })
+                }).catch(() => {});
+            }
         });
     });
 

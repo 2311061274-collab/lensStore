@@ -59,10 +59,11 @@
             <div class="sf-cart-dropdown" style="position:relative;display:inline-block;">
                 <a href="{{ route('cart.index') }}" style="position:relative;cursor:pointer;text-decoration:none;color:var(--text-muted);font-weight:500;padding:6px 12px;border-radius:8px;transition:all 0.2s;font-size:0.9rem;display:inline-flex;align-items:center;gap:6px;">
                     <i class="fa-solid fa-cart-shopping"></i> Giỏ hàng
-                    @php $sfCartItems = \App\Models\Cart::where('user_id', auth()->id())->get(); @endphp
-                    @if($sfCartItems->sum('quantity') > 0)
-                        <span style="position:absolute;top:-4px;right:-2px;background:#ef4444;color:white;border-radius:50%;padding:1px 5px;font-size:0.65rem;font-weight:700;line-height:1.4;">{{ $sfCartItems->sum('quantity') }}</span>
-                    @endif
+                    @php 
+                        $sfCartItems = \App\Models\Cart::where('user_id', auth()->id())->get(); 
+                        $sfCartCount = $sfCartItems->sum('quantity');
+                    @endphp
+                    <span id="cart-count" class="sf-cart-badge" style="position:absolute;top:-4px;right:-2px;background:#ef4444;color:white;border-radius:50%;padding:1px 5px;font-size:0.65rem;font-weight:700;line-height:1.4;{{ $sfCartCount > 0 ? '' : 'display:none;' }}">{{ $sfCartCount }}</span>
                 </a>
                 <div class="sf-cart-menu" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:white;width:340px;box-shadow:0 20px 40px rgba(0,0,0,0.12);border-radius:16px;z-index:100;border:1px solid var(--border);overflow:hidden;">
                     <div style="padding:14px 18px;font-weight:700;border-bottom:1px solid var(--border);font-size:0.9rem;">🛒 Giỏ hàng của bạn</div>

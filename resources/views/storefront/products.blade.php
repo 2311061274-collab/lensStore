@@ -201,7 +201,13 @@
                         <div class="product-price">{{ $product->formatted_price }}</div>
                         <div style="display:flex;gap:6px;">
                             <a href="{{ route('storefront.show', $product->id) }}" class="btn-view"><i class="fa-solid fa-eye"></i></a>
-                            <button type="button" class="btn-add add-to-cart-btn" data-id="{{ $product->id }}">
+                            <button type="button" class="btn-add add-to-cart-btn" 
+                                data-id="{{ $product->id }}"
+                                data-name="{{ $product->name }}"
+                                data-price="{{ $product->price }}"
+                                data-price-formatted="{{ $product->formatted_price }}"
+                                data-image="{{ $product->image_url }}"
+                                data-url="{{ route('storefront.show', $product->id) }}">
                                 <i class="fa-solid fa-cart-plus"></i> Thêm
                             </button>
                         </div>
@@ -223,17 +229,75 @@
 <script>
 const isLoggedIn = {{ Auth::check() ? 'true' : 'false' }};
 const csrfToken = '{{ csrf_token() }}';
+
+function addToClientCart(product) {
+    let items = [];
+    try {
+        items = JSON.parse(localStorage.getItem('ls_cart_items') || '[]');
+    } catch(e) { items = []; }
+
+    const existingIndex = items.findIndex(it => String(it.product_id) === String(product.id) || String(it.id) === String(product.id));
+    if (existingIndex > -1) {
+        items[existingIndex].quantity = (parseInt(items[existingIndex].quantity) || 1) + 1;
+    } else {
+        items.push({
+            id: product.id,
+            product_id: product.id,
+            name: product.name,
+            price: parseFloat(product.price) || 0,
+            price_formatted: product.price_formatted || (new Intl.NumberFormat('vi-VN').format(product.price) + ' ₫'),
+            image: product.image || '',
+            url: product.url || '#',
+            quantity: 1,
+            is_selected: true
+        });
+    }
+
+    const totalCount = items.reduce((acc, it) => acc + (parseInt(it.quantity) || 1), 0);
+    localStorage.setItem('ls_cart_items', JSON.stringify(items));
+    localStorage.setItem('ls_cart_count', totalCount.toString());
+
+    const badge = document.getElementById('cart-count');
+    if (badge) {
+        badge.textContent = totalCount;
+        badge.style.display = totalCount > 0 ? '' : 'none';
+    }
+    document.querySelectorAll('.sf-cart-dropdown span, .sf-cart-badge').forEach(el => {
+        el.textContent = totalCount;
+        el.style.display = totalCount > 0 ? '' : 'none';
+    });
+}
+
 document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
     btn.addEventListener('click', function() {
-        if (!isLoggedIn) { window.location.href="{{ route('login') }}"; return; }
-        const productId = this.dataset.id;
-        fetch("{{ route('cart.add') }}", {
-            method:'POST',
-            headers:{'Content-Type':'application/json','X-CSRF-TOKEN':csrfToken,'Accept':'application/json'},
-            body:JSON.stringify({product_id:productId,quantity:1})
-        }).then(r=>r.json()).then(d=>{
-            if(d.success){ this.innerHTML='<i class="fa-solid fa-check"></i> Đã thêm'; setTimeout(()=>{ this.innerHTML='<i class="fa-solid fa-cart-plus"></i> Thêm'; },1500); }
-        });
+        const product = {
+            id: this.dataset.id,
+            name: this.dataset.name || this.closest('.product-card')?.querySelector('.product-name')?.textContent?.trim() || '',
+            price: parseFloat(this.dataset.price) || 0,
+            price_formatted: this.dataset.priceFormatted || '',
+            image: this.dataset.image || this.closest('.product-card')?.querySelector('img')?.src || '',
+            url: this.dataset.url || this.closest('.product-card')?.querySelector('a')?.href || '#'
+        };
+
+        addToClientCart(product);
+
+        const originalHtml = this.innerHTML;
+        this.innerHTML = '<i class="fa-solid fa-check"></i> Đã thêm';
+        this.style.background = '#10b981';
+        this.style.color = '#ffffff';
+        setTimeout(() => {
+            this.innerHTML = originalHtml;
+            this.style.background = '';
+            this.style.color = '';
+        }, 1500);
+
+        if (isLoggedIn) {
+            fetch("{{ route('cart.add') }}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json'},
+                body: JSON.stringify({product_id: product.id, quantity: 1})
+            }).catch(() => {});
+        }
     });
 });
 </script>

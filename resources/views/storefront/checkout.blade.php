@@ -212,7 +212,7 @@
             <div class="checkout-card" style="position: sticky; top: 100px;">
                 <h3 class="checkout-card-title"><i class="fa-solid fa-bag-shopping"></i> Đơn hàng của bạn</h3>
 
-                <div style="margin-bottom: 1.5rem;">
+                <div id="checkout-order-items" style="margin-bottom: 1.5rem;">
                     @php $subtotal = 0; @endphp
                     @foreach($carts as $cart)
                         @php $subtotal += $cart->product->price * $cart->quantity; @endphp
@@ -322,7 +322,7 @@
 // ================================================================
 //  CONFIG & DUAL-MODE DETECTION
 // ================================================================
-const SUBTOTAL = {{ $subtotal }};
+let SUBTOTAL = {{ $subtotal }};
 const isStaticSite = window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
 const ROUTES = {
     provinces:       '{{ route("ghn.provinces") }}',
@@ -441,6 +441,44 @@ function setShippingDisplay(html, fee = 0) {
     document.getElementById('shipping_fee_input').value = fee;
     shippingFee = fee;
     updateTotal();
+}
+
+function syncClientCheckoutItems() {
+    try {
+        const raw = localStorage.getItem('ls_cart_items');
+        if (!raw) return;
+        const items = JSON.parse(raw).filter(it => it.is_selected !== false);
+        if (!items || items.length === 0) return;
+
+        const container = document.getElementById('checkout-order-items');
+        if (!container) return;
+
+        container.innerHTML = '';
+        let newSubtotal = 0;
+        items.forEach(it => {
+            const price = parseFloat(it.price) || 0;
+            const qty = parseInt(it.quantity) || 1;
+            const itemTotal = price * qty;
+            newSubtotal += itemTotal;
+
+            const div = document.createElement('div');
+            div.className = 'order-item';
+            div.innerHTML = `
+                <img src="${it.image || ''}" class="order-img" alt="${it.name}">
+                <div class="order-info">
+                    <div class="order-name">${it.name}</div>
+                    <div class="order-qty">Số lượng: ${qty}</div>
+                </div>
+                <div class="order-price">${formatVND(itemTotal)}</div>
+            `;
+            container.appendChild(div);
+        });
+
+        SUBTOTAL = newSubtotal;
+        const subtotalEl = document.querySelector('.summary-row span:last-child');
+        if (subtotalEl) subtotalEl.textContent = formatVND(newSubtotal);
+        updateTotal();
+    } catch(e) {}
 }
 
 function enableOrder(enable) {
@@ -967,8 +1005,16 @@ function handleStaticCheckout(name, phone, address, province, ward, payment) {
         const stored = JSON.parse(localStorage.getItem('ls_orders') || '[]');
         stored.unshift(newOrder);
         localStorage.setItem('ls_orders', JSON.stringify(stored));
+        localStorage.removeItem('ls_cart_items');
         localStorage.setItem('ls_cart_count', '0');
         localStorage.setItem('ls_last_order_code', orderId);
+
+        const badge = document.getElementById('cart-count');
+        if (badge) { badge.textContent = '0'; badge.style.display = 'none'; }
+        document.querySelectorAll('.sf-cart-dropdown span, .sf-cart-badge').forEach(el => {
+            el.textContent = '0';
+            el.style.display = 'none';
+        });
     } catch(e) {}
 
     setTimeout(() => {
@@ -1050,6 +1096,7 @@ function escapeHtml(str) {
 
 // Khởi tạo
 loadProvinces();
+syncClientCheckoutItems();
 </script>
 @endsection
 
