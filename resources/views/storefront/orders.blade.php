@@ -121,4 +121,100 @@
         </div>
     @endif
 </div>
+
+<script>
+(function() {
+    const isStatic = window.location.hostname.includes('github.io') || window.location.protocol === 'file:';
+    const container = document.querySelector('.orders-container');
+    if (!container) return;
+
+    // 1. Kiểm tra thông báo đặt hàng thành công
+    const lastOrderCode = localStorage.getItem('ls_last_order_code');
+    if (lastOrderCode) {
+        const alertHtml = `
+            <div style="background:#dcfce7; color:#166534; padding:1.2rem 1.5rem; border-radius:14px; margin-bottom:2rem; border:1px solid #86efac; display:flex; align-items:center; gap:14px; font-weight:600; box-shadow:0 4px 12px rgba(16,185,129,0.12);">
+                <i class="fa-solid fa-circle-check" style="font-size:1.6rem; color:#10b981;"></i>
+                <div style="flex:1;">
+                    <div style="font-size:1.05rem; font-weight:700; margin-bottom:2px;">Đặt hàng thành công!</div>
+                    <div style="font-size:0.9rem; opacity:0.9;">Đơn hàng <strong>#${lastOrderCode}</strong> đã được ghi nhận vào hệ thống LensStore và đang chờ đóng gói.</div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+        localStorage.removeItem('ls_last_order_code');
+    }
+
+    // 2. Nạp các đơn hàng đã đặt trong phiên demo trên GitHub Pages
+    try {
+        const storedOrders = JSON.parse(localStorage.getItem('ls_orders') || '[]');
+        if (storedOrders.length > 0) {
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            storedOrders.forEach(ord => {
+                // Tránh trùng lặp nếu đã render
+                if (container.querySelector(`[data-order-code="${ord.order_code}"]`)) return;
+
+                const itemsHtml = (ord.items || []).map(it => `
+                    <div style="display:flex; align-items:center; gap:10px; margin-right:15px; margin-bottom:6px;">
+                        ${it.image ? `<img src="${it.image}" class="preview-img" alt="${it.name}">` : ''}
+                        <div>
+                            <div style="font-weight:600; font-size:0.9rem; color:var(--text-main);">${it.name}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted);">${it.qty} · ${it.price}</div>
+                        </div>
+                    </div>
+                `).join('');
+
+                const cardHtml = `
+                    <div class="order-card" data-order-code="${ord.order_code}" style="border:1.5px solid rgba(79,70,229,0.3); box-shadow:0 8px 20px rgba(79,70,229,0.08);">
+                        <div class="order-card-header" style="background:#f5f3ff;">
+                            <div>
+                                <div class="order-id" style="color:var(--primary);">#${ord.order_code} <span style="font-size:0.75rem; background:#4f46e5; color:white; padding:2px 8px; border-radius:10px; margin-left:6px; font-weight:600;">Vừa đặt</span></div>
+                                <div class="order-date">${ord.created_at}</div>
+                            </div>
+                            <span class="order-status" style="background:${ord.status_color || '#f59e0b'};">
+                                ${ord.status_label || 'Chờ xử lý'}
+                            </span>
+                        </div>
+                        <div class="order-card-body">
+                            <div class="order-meta">
+                                <span><i class="fa-solid fa-user"></i> <strong>${ord.recipient_name}</strong></span>
+                                <span><i class="fa-solid fa-phone"></i> <strong>${ord.recipient_phone}</strong></span>
+                                <span><i class="fa-solid fa-location-dot"></i> ${ord.address}</span>
+                            </div>
+                            <div class="order-items-preview" style="display:flex; flex-direction:column; gap:8px;">
+                                ${itemsHtml}
+                            </div>
+                        </div>
+                        <div class="order-card-footer">
+                            <div>
+                                <div class="order-total">Tổng: ${ord.total}</div>
+                                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+                                    <i class="fa-solid fa-credit-card"></i> ${ord.payment_method}
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <span style="font-size:0.85rem; color:#10b981; font-weight:600; padding:6px 12px; background:#dcfce7; border-radius:8px; display:inline-flex; align-items:center; gap:5px;">
+                                    <i class="fa-solid fa-shield-check"></i> Đã bảo vệ đơn hàng
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Chèn lên đầu danh sách sau tiêu đề
+                const titleEl = container.querySelector('.page-title');
+                if (titleEl) {
+                    titleEl.insertAdjacentHTML('afterend', cardHtml);
+                } else {
+                    container.insertAdjacentHTML('afterbegin', cardHtml);
+                }
+            });
+        }
+    } catch(e) {
+        console.warn('Orders localStorage load error:', e);
+    }
+})();
+</script>
 @endsection
+
