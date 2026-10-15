@@ -223,7 +223,7 @@
         <button type="button" id="ls-chat-product-clear" aria-label="Bỏ sản phẩm"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="ls-chat-body" id="ls-chat-messages">
-        <div class="ls-chat-empty" id="ls-chat-loading"><i class="fa-solid fa-spinner fa-spin"></i>Đang tải hội thoại...</div>
+        <div class="ls-chat-empty"><i class="fa-regular fa-comments"></i>Bắt đầu chat với LensStore.<br><small>Hỏi thông số, loại máy, giá bán hoặc bảo hành.</small></div>
     </div>
     <div id="ls-chat-img-preview" style="display: none; padding: 10px 14px; background: #f8fafc; border-top: 1px solid #e2e8f0; position: relative;">
         <img id="ls-chat-img-preview-img" src="" alt="Preview" style="max-height: 80px; border-radius: 8px; border: 1px solid #e2e8f0;">
@@ -259,9 +259,9 @@
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
     const isAuth = true;
     const urls = {
-        messages: '{{ route('user.chat.messages') }}',
-        send: '{{ route('user.chat.send') }}',
-        unread: '{{ route('user.chat.unread') }}',
+        messages: '{{ route('user.chat.messages', [], false) }}',
+        send: '{{ route('user.chat.send', [], false) }}',
+        unread: '{{ route('user.chat.unread', [], false) }}',
     };
 
     let lastId = 0;
@@ -337,30 +337,48 @@
 
     async function loadMessages(full) {
         if (!isAuth || !urls.messages) return;
-        const params = new URLSearchParams();
-        if (!full && lastId) params.set('since_id', String(lastId));
-        if (panel.classList.contains('is-open')) params.set('mark_read', '1');
-        const res = await fetch(urls.messages + (params.toString() ? '?' + params.toString() : ''), {
-            headers: { 'Accept': 'application/json' }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (full || !loaded) {
-            renderAll(data.messages || []);
-            loaded = true;
-        } else {
-            appendMessages(data.messages || []);
+        try {
+            const params = new URLSearchParams();
+            if (!full && lastId) params.set('since_id', String(lastId));
+            if (panel.classList.contains('is-open')) params.set('mark_read', '1');
+            const res = await fetch(urls.messages + (params.toString() ? '?' + params.toString() : ''), {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!res.ok) {
+                if (!loaded) {
+                    renderAll([]);
+                    loaded = true;
+                }
+                return;
+            }
+            const data = await res.json();
+            if (full || !loaded) {
+                renderAll(data.messages || []);
+                loaded = true;
+            } else {
+                appendMessages(data.messages || []);
+            }
+            if (!panel.classList.contains('is-open')) setBadge(data.unread || 0);
+            else setBadge(0);
+        } catch (e) {
+            console.warn('Chat loadMessages error:', e);
+            if (!loaded) {
+                renderAll([]);
+                loaded = true;
+            }
         }
-        if (!panel.classList.contains('is-open')) setBadge(data.unread || 0);
-        else setBadge(0);
     }
 
     async function loadUnread() {
         if (!isAuth || !urls.unread || panel.classList.contains('is-open')) return;
-        const res = await fetch(urls.unread, { headers: { 'Accept': 'application/json' } });
-        if (!res.ok) return;
-        const data = await res.json();
-        setBadge(data.unread || 0);
+        try {
+            const res = await fetch(urls.unread, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) return;
+            const data = await res.json();
+            setBadge(data.unread || 0);
+        } catch (e) {
+            // Ignore polling errors
+        }
     }
 
     async function sendMessage() {

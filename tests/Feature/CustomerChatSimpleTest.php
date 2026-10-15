@@ -167,4 +167,15 @@ class CustomerChatSimpleTest extends TestCase
         // Tuyệt đối không phát sinh bất kỳ yêu cầu mạng Http nào
         Http::assertNothingSent();
     }
+
+    public function test_staff_can_also_chat_on_storefront_without_403(): void
+    {
+        $response = $this->actingAs($this->staff)->getJson(route('user.chat.messages'));
+        $response->assertOk();
+
+        $sendResponse = $this->actingAs($this->staff)->postJson(route('user.chat.send'), [
+            'message' => 'Nhân viên test hỏi giá trên storefront',
+        ]);
+        $sendResponse->assertOk();
+    }
 }

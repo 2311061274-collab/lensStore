@@ -30,12 +30,6 @@ class ChatController extends Controller
             ]);
         }
 
-        if (ChatSupport::isStaff($user)) {
-            return response()->json([
-                'error' => 'Nhân viên vui lòng trả lời khách từ trang quản lý.',
-            ], 403);
-        }
-
         $userId = $user->id;
         $sinceId = (int) $request->query('since_id', 0);
 
@@ -75,12 +69,6 @@ class ChatController extends Controller
     {
         $user = $this->getOrCreateUser();
 
-        if (ChatSupport::isStaff($user)) {
-            return response()->json([
-                'error' => 'Nhân viên vui lòng trả lời khách từ trang quản lý.',
-            ], 403);
-        }
-
         $data = $request->validate([
             'message' => 'nullable|string|max:2000',
             'product_id' => 'nullable|exists:products,id',
@@ -93,6 +81,15 @@ class ChatController extends Controller
         }
 
         $agent = ChatSupport::defaultAgent();
+        if (! $agent || $agent->id === $user->id) {
+            $otherStaff = User::whereIn('role', ['admin', 'staff'])->where('id', '!=', $user->id)->first();
+            if ($otherStaff) {
+                $agent = $otherStaff;
+            } elseif (! $agent) {
+                $agent = User::first();
+            }
+        }
+
         if (! $agent) {
             return response()->json(['error' => 'Hiện chưa có nhân viên hỗ trợ. Vui lòng thử lại sau.'], 503);
         }
